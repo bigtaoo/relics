@@ -38,7 +38,8 @@ dotnet test Automatic.sln
 
 ## 分支与提交
 
-- 禁止直接提交 `main`。每个任务一个分支（或 worktree），合进当日分支 `DD.MM.YYYY`。
+- **当前阶段（技术与美术验证期）直接在 `main` 上提交**，不建每日分支。
+- 验证完成、开始加功能后切换为：禁止直接提交 `main`，每个任务一个分支（或 worktree），合进当日分支 `DD.MM.YYYY`。切换时更新本条。
 - 只 `git add` 自己改过的路径，不要 `git add -A`。
 - 先更新 `design/` 对应文档，再提交代码。
 
