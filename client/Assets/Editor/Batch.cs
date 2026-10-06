@@ -37,6 +37,8 @@ namespace Automatic.Editor
 
         public static void ArtPreviewZheng() => Run(ArtPreview.Zheng);
 
+        public static void BoardSlice() => Run(Automatic.Editor.BoardSlice.Build);
+
         private static void Run(Action action)
         {
             try

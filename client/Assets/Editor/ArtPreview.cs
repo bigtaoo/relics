@@ -77,7 +77,7 @@ namespace Automatic.Editor
             return go;
         }
 
-        private static Bounds Bounds(GameObject go)
+        internal static Bounds Bounds(GameObject go)
         {
             var rs = go.GetComponentsInChildren<Renderer>();
             var b = rs[0].bounds;
