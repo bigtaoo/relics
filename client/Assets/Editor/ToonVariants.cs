@@ -23,9 +23,10 @@ namespace Automatic.Editor
 
         public static readonly ToonVariants[] All =
         {
-            // Painted terracotta: matte, red clay with dark painted spots.
-            Plain("pottery", new(0.66f, 0.33f, 0.2f), new(0.28f, 0.13f, 0.08f), new(0.74f, 0.42f, 0.28f),
-                shade: new(0.6f, 0.45f, 0.45f), rimStrength: 0.15f),
+            // Grey pottery: matte, cool grey clay with darker fired spots. Not red clay: that read as
+            // the living state (red-gold) and as the enemy's red pedestals (art/board/README.md).
+            Plain("pottery", new(0.6f, 0.59f, 0.56f), new(0.33f, 0.32f, 0.31f), new(0.72f, 0.7f, 0.66f),
+                shade: new(0.55f, 0.54f, 0.62f), rimStrength: 0.15f),
             // The base texture as authored: bronze with patina.
             new() { Name = "bronze", Recolor = 0, Highlight = new(0.5f, 0.42f, 0.25f), HighlightSize = 0.06f },
             // Pale jade with deeper green inclusions; light shadows and a strong rim read as translucent.

@@ -13,9 +13,11 @@ namespace Automatic.Editor
     /// <summary>
     /// UI slice (design/08 §3): the preparation-phase shop with the tenpai hint over the board,
     /// and the hu show where buying the last piece forms the hand, with the UI and the board
-    /// effect (FxTimeline.HandFormed) on one timeline. Renders into artifacts/ui/: a still per
-    /// target aspect ratio (08 §6) and the hu sequence frames; tools/ui/ui_media.py makes the
-    /// review media in art/ui/.
+    /// effect (FxTimeline.HandFormed) on one timeline, followed by the start of the battle: the
+    /// shop tray slides away and the camera moves from the preparation framing to the battle
+    /// framing of the whole table (04 §2) as the opponent's pieces arrive. Renders into
+    /// artifacts/ui/: a still per target aspect ratio (08 §6) and the hu and battle-start
+    /// sequence frames; tools/ui/ui_media.py makes the review media in art/ui/.
     /// </summary>
     public static class UiSlice
     {
@@ -25,6 +27,8 @@ namespace Automatic.Editor
 
         // Hu sequence timeline (seconds).
         private const float Press = 0.6f, FlyStart = 0.75f, FlyEnd = 1.15f, Board = 1.2f, Hold = 3.4f, Dock = 3.8f, End = 4.4f;
+        // Battle start (seconds, continuing the hu timeline).
+        private const float Fight = 4.6f, MoveStart = 4.75f, MoveEnd = 5.65f, Arrive = 5.2f, Bars = 5.9f, Finish = 6.6f;
 
         public static void Build()
         {
@@ -38,6 +42,7 @@ namespace Automatic.Editor
             timeline.PrepPhase(units);
             var hand = timeline.HandFormed(units, Board);
             var newcomer = hand[^1].Root; // the piece bought from the shop
+            newcomerAt = newcomer.position;
 
             var board = Object.FindFirstObjectByType<Camera>();
             board.cullingMask &= ~(1 << UiCapture.UiLayer);
@@ -57,16 +62,29 @@ namespace Automatic.Editor
                 UiCapture.Composite(board, ui, w, h, Path.Combine(outDir, name + ".png"));
             }
 
-            var seqDir = Path.Combine(outDir, "hu");
-            Directory.CreateDirectory(seqDir);
+            var huDir = Path.Combine(outDir, "hu");
+            var startDir = Path.Combine(outDir, "start");
+            Directory.CreateDirectory(huDir);
+            Directory.CreateDirectory(startDir);
+            BoardSlice.Fit(board, (float)SeqW / SeqH);
+            var battlePos = board.transform.position;
             Frame(board, ui, canvas, SeqW, SeqH);
-            var frames = Mathf.RoundToInt(End * Fps);
+            var prepPos = board.transform.position;
+            var enemies = units.Where(u => u.Root.position.z > 0).OrderBy(u => u.Root.position.z).ThenBy(u => u.Root.position.x).ToList();
+            var enemyAt = enemies.Select(u => u.Root.position).ToArray();
+            timeline.Anims.AddRange(enemies.Select(u => (u, "idle", Arrive))); // a re-enabled Animator drops the saved pose
+            var bars = units.SelectMany(u => u.Root.Cast<Transform>()).Where(c => c.name is "BarBack" or "BarFill").ToList();
+            var trayY = ((RectTransform)shop.Find("ShopTray")).anchoredPosition.y;
+            var huFrames = Mathf.RoundToInt(End * Fps);
+            var frames = Mathf.RoundToInt(Finish * Fps);
             for (var f = 0; f <= frames; f++)
             {
                 var t = f / Fps;
                 timeline.Step(t);
                 Show(shop, t, newcomer);
-                UiCapture.Composite(board, ui, SeqW, SeqH, Path.Combine(seqDir, $"frame_{f:D3}.png"));
+                BattleStart(shop, t, trayY, board, prepPos, battlePos, enemies, enemyAt, bars);
+                var file = f <= huFrames ? Path.Combine(huDir, $"frame_{f:D3}.png") : Path.Combine(startDir, $"frame_{f - huFrames - 1:D3}.png");
+                UiCapture.Composite(board, ui, SeqW, SeqH, file);
             }
             var info = $"fps {Fps}, frames {frames + 1}, effect instances {timeline.Effects.Count}, " +
                        $"particle systems {timeline.SystemCount}, peak live particles {timeline.Peak}, {Stats(shop)}";
@@ -114,6 +132,8 @@ namespace Automatic.Editor
             FitInto(board, points, free);
             huCentre = new Vector3((free.center.x - 0.5f) * size.x, 90, 0);
         }
+
+        private static Vector3 newcomerAt;
 
         /// <summary>Where the hu show plays: centred over the board area the HUD leaves free.</summary>
         private static Vector3 huCentre;
@@ -164,7 +184,7 @@ namespace Automatic.Editor
             // The bought piece drops onto the board as the card lands.
             var drop = Mathf.InverseLerp(FlyEnd - 0.15f, FlyEnd, t);
             newcomer.gameObject.SetActive(drop > 0);
-            newcomer.localScale = Vector3.one * Back(drop);
+            newcomer.position = newcomerAt + Vector3.up * 1.5f * (1 - drop) * (1 - drop); // not scaled: see BattleStart
 
             // The empty tile becomes a real one; then the tiles turn over in step with the pieces on the board.
             var filled = t >= FlyEnd;
@@ -212,10 +232,34 @@ namespace Automatic.Editor
             Canvas.ForceUpdateCanvases();
         }
 
-        private static float Smooth(float x) => x * x * (3 - 2 * x);
+        // ---- Battle start ----------------------------------------------------------------------
 
-        /// <summary>Ease out with a small overshoot.</summary>
-        private static float Back(float x) => x <= 0 ? 0 : 1 + 2.2f * Mathf.Pow(x - 1, 3) + 1.2f * Mathf.Pow(x - 1, 2);
+        /// <summary>
+        /// The shop tray slides off and the round bar switches to the battle; the camera keeps its
+        /// angle and glides from the preparation framing to the whole table; the opponent's pieces
+        /// drop onto their cells row by row (their formed hand already living); then the health bars appear.
+        /// </summary>
+        private static void BattleStart(RectTransform shop, float t, float trayY, Camera board, Vector3 prep, Vector3 battle,
+            List<SliceUnit> enemies, Vector3[] enemyAt, List<Transform> bars)
+        {
+            var tray = (RectTransform)shop.Find("ShopTray");
+            var slide = Smooth(Mathf.InverseLerp(Fight, Fight + 0.35f, t));
+            tray.anchoredPosition = new Vector2(tray.anchoredPosition.x, trayY - slide * (tray.rect.height + 40));
+            shop.Find("RoundBar/Round").GetComponent<TextMeshProUGUI>().text = t < Fight ? "第 6 回合 · 准备" : "第 6 回合 · 战斗";
+            board.transform.position = Vector3.Lerp(prep, battle, Smooth(Mathf.InverseLerp(MoveStart, MoveEnd, t)));
+            for (var i = 0; i < enemies.Count; i++)
+            {
+                var drop = Mathf.InverseLerp(0, 0.25f, t - (Arrive + 0.025f * i));
+                enemies[i].Root.gameObject.SetActive(drop > 0);
+                // Dropped from above rather than scaled up: in the editor a skinned mesh under a root
+                // that was scaled down keeps its small skinning after the scale is restored.
+                enemies[i].Root.position = enemyAt[i] + Vector3.up * 1.5f * (1 - drop) * (1 - drop);
+            }
+            foreach (var bar in bars) bar.gameObject.SetActive(t >= Bars);
+            Canvas.ForceUpdateCanvases();
+        }
+
+        private static float Smooth(float x) => x * x * (3 - 2 * x);
 
         private static void Alpha(Transform t, float a)
         {

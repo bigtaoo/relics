@@ -27,7 +27,7 @@ namespace Automatic.Editor
         /// <summary>Frame tint and display name per cost tier, cheapest first (04 §6).</summary>
         public static readonly (string Material, string Label, Color Frame)[] Tiers =
         {
-            ("pottery", "陶", new(0.72f, 0.4f, 0.27f)),
+            ("pottery", "陶", new(0.62f, 0.6f, 0.56f)),
             ("bronze", "青铜", new(0.36f, 0.56f, 0.5f)),
             ("jade", "玉", new(0.55f, 0.8f, 0.6f)),
             ("gold", "金", new(0.98f, 0.78f, 0.3f)),

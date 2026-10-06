@@ -35,6 +35,8 @@ namespace Automatic.Editor
 
         public readonly List<(SliceUnit Unit, string Clip, float Start)> Anims = new();
         public readonly List<SliceFx> Effects = new();
+        /// <summary>Material changes: the unit wears After from At on, Before until then.</summary>
+        public readonly List<(SliceUnit Unit, Material Before, Material After, float At)> Swaps = new();
         public int Peak;
 
         private readonly Dictionary<string, AnimationClip> clips;
@@ -53,6 +55,7 @@ namespace Automatic.Editor
                 else if (t - start <= c.length) c.SampleAnimation(unit.Model, t - start);
                 else clips["idle"].SampleAnimation(unit.Model, (t - start - c.length) % clips["idle"].length);
             }
+            foreach (var (unit, before, after, at) in Swaps) Wear(unit, t < at ? before : after);
             var dt = last < 0 ? 0 : t - last;
             last = t;
             foreach (var e in Effects)
@@ -99,6 +102,15 @@ namespace Automatic.Editor
 
         public static SliceUnit Nearest(List<SliceUnit> units, Vector3 p) => units.OrderBy(u => (u.Root.position - p).sqrMagnitude).First();
 
+        public static Material Variant(string variant) =>
+            AssetDatabase.LoadAssetAtPath<Material>(BoardSlice.ZhengDir + "zheng_" + variant + ".mat");
+
+        public static void Wear(SliceUnit unit, Material mat)
+        {
+            foreach (var r in unit.Model.GetComponentsInChildren<Renderer>())
+                r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
+        }
+
         public static SliceFx Spawn(string prefab, Vector3 pos, float start)
         {
             var go = (GameObject)PrefabUtility.InstantiatePrefab(FxPrefabs.Load(prefab));
@@ -109,8 +121,8 @@ namespace Automatic.Editor
 
         /// <summary>
         /// Preparation phase: only the player's side, no acting unit, no health bars, every piece an
-        /// artifact at rest (first frame of `awaken`). The pottery piece at the front centre (the
-        /// board slice's acting unit) is switched to bronze.
+        /// artifact of its cost tier at rest (first frame of `awaken`); the board scene is saved in
+        /// the battle phase, where the formed hand is already living.
         /// </summary>
         public void PrepPhase(List<SliceUnit> units)
         {
@@ -118,10 +130,9 @@ namespace Automatic.Editor
             foreach (var t in Object.FindObjectsByType<Transform>(FindObjectsInactive.Include, FindObjectsSortMode.None)
                          .Where(t => t.name is "ActiveRing" or "BarBack" or "BarFill"))
                 t.gameObject.SetActive(false);
-            var bronze = AssetDatabase.LoadAssetAtPath<Material>(BoardSlice.ZhengDir + "zheng_bronze.mat");
-            foreach (var r in Nearest(units, BoardLayout.CellPos(-1, 0, 2)).Model.GetComponentsInChildren<Renderer>())
-                r.sharedMaterials = Enumerable.Repeat(bronze, r.sharedMaterials.Length).ToArray();
-            Anims.AddRange(units.Where(u => u.Root.gameObject.activeSelf).Select(u => (u, "awaken", 1e6f)));
+            var mine = units.Where(u => u.Root.gameObject.activeSelf).ToList();
+            foreach (var u in mine) Wear(u, Variant(BoardSlice.TierOf(u.Root)));
+            Anims.AddRange(mine.Select(u => (u, "awaken", 1e6f)));
         }
 
         /// <summary>The example hand: five cells of the player's half forming a ring, linked in this order.</summary>
@@ -133,17 +144,20 @@ namespace Automatic.Editor
         public static float SealAt => LightAt(HandCells.Length - 1) + 0.15f;
 
         /// <summary>
-        /// Hand-formed show starting at `offset`: each piece lights up (pillar) and awakens, links
-        /// draw the hand's shape, the seal lands at the centre. Returns the hand's units in order.
+        /// Hand-formed show starting at `offset`: each piece lights up (pillar) and awakens, turning
+        /// from artifact to living inside the pillar's flash (only formed pieces come alive, 04 §6),
+        /// links draw the hand's shape, the seal lands at the centre. Returns the hand's units in order.
         /// </summary>
         public SliceUnit[] HandFormed(List<SliceUnit> units, float offset)
         {
             var hand = HandCells.Select(c => Nearest(units, BoardLayout.CellPos(-1, c.Row, c.Col))).ToArray();
+            var living = Variant("living");
             for (var i = 0; i < hand.Length; i++)
             {
                 var at = offset + LightAt(i);
                 Anims.RemoveAll(a => a.Unit == hand[i]);
                 Anims.Add((hand[i], "awaken", at));
+                Swaps.Add((hand[i], Variant(BoardSlice.TierOf(hand[i].Root)), living, at + 0.1f));
                 Effects.Add(Spawn(FxPrefabs.HuPiece, hand[i].Root.position, at));
                 if (i == 0) continue;
                 Effects.Add(Link(hand[i - 1].Root.position, hand[i].Root.position, at + 0.05f));

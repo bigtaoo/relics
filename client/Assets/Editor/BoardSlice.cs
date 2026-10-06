@@ -17,7 +17,9 @@ namespace Automatic.Editor
 {
     /// <summary>
     /// Board slice (design/08 §2): one full board (both halves and benches filled with Zheng in
-    /// mixed cost-tier materials, team pedestals and health bars, one unit acting), saved as a
+    /// mixed cost-tier materials, team pedestals and health bars, one unit acting) in the battle
+    /// phase: only the pieces of a formed hand are living (04 §6), five on the player's side
+    /// (FxTimeline.HandCells) and three on the enemy's; the rest stay artifacts. Saved as a
     /// hot-update scene and rendered from the battle camera at the three target aspect ratios
     /// (08 §6) into artifacts/board/, with renderer and triangle counts in stats.txt.
     /// </summary>
@@ -34,6 +36,12 @@ namespace Automatic.Editor
 
         // Cost tiers weighted towards the cheap end, as a mid-game board would be.
         private static readonly string[] Tiers = { "pottery", "pottery", "pottery", "bronze", "bronze", "bronze", "jade", "jade", "gold" };
+
+        /// <summary>The enemy's formed hand (cells on their half).</summary>
+        private static readonly (int Row, int Col)[] EnemyHand = { (1, 1), (1, 3), (2, 2) };
+
+        /// <summary>Unit roots are named "Unit &lt;tier&gt;": the artifact material, also for living pieces.</summary>
+        internal static string TierOf(Transform root) => root.name.Substring("Unit ".Length);
 
         private static readonly (string Name, int W, int H)[] Shots = { ("phone_19.5x9", 2340, 1080), ("pad_4x3", 1440, 1080), ("pc_16x9", 1920, 1080) };
 
@@ -74,9 +82,10 @@ namespace Automatic.Editor
 
             var rng = new Random(7);
             var units = new GameObject("Units").transform;
-            void Place(Vector3 pos, int side, string mat, string clip, float time, float size, bool active = false)
+            void Place(Vector3 pos, int side, string tier, bool living, string clip, float time, float size, bool active = false)
             {
-                var root = new GameObject("Unit").transform;
+                var root = new GameObject("Unit " + tier).transform;
+                var mat = living ? "living" : tier;
                 root.SetParent(units);
                 root.position = pos;
                 var pedestal = BoardDressing.Spawn("Pedestal", pedestalMesh, team[side > 0 ? 1 : 0].Pedestal);
@@ -107,11 +116,12 @@ namespace Automatic.Editor
                     {
                         var acting = side < 0 && row == 0 && col == 2;
                         var hit = side > 0 && row == 0 && col == 2;
-                        Place(BoardLayout.CellPos(side, row, col), side, acting ? "living" : Tiers[rng.Next(Tiers.Length)],
+                        var formed = (side < 0 ? FxTimeline.HandCells : EnemyHand).Contains((row, col));
+                        Place(BoardLayout.CellPos(side, row, col), side, Tiers[rng.Next(Tiers.Length)], formed,
                             acting ? "attack" : hit ? "hit" : "idle", acting || hit ? 0.35f : (float)rng.NextDouble() * 2, 1, acting);
                     }
                 for (var slot = 0; slot < BoardLayout.BenchSlots; slot++)
-                    Place(BoardLayout.BenchPos(side, slot), side, Tiers[rng.Next(Tiers.Length)], "idle", (float)rng.NextDouble() * 2, BenchScale);
+                    Place(BoardLayout.BenchPos(side, slot), side, Tiers[rng.Next(Tiers.Length)], false, "idle", (float)rng.NextDouble() * 2, BenchScale);
             }
 
             var cam = NewCamera(16f / 9);
