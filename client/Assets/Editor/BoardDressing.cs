@@ -205,7 +205,7 @@ namespace Automatic.Editor
 
         public static Mesh SaveMesh(string name, Mesh mesh)
         {
-            var path = Dir + name + ".asset";
+            var path = Dir + name + "_mesh.asset"; // YooAsset addresses by file name, so not "<name>.asset" next to "<name>.mat"
             mesh.name = name;
             var old = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             if (old == null)
@@ -240,7 +240,7 @@ namespace Automatic.Editor
                 for (var x = 0; x < w; x++)
                     px[y * w + x] = pixel((x + 0.5f) / w, (y + 0.5f) / h);
             tex.SetPixels(px);
-            var path = Dir + name + ".png";
+            var path = Dir + name + "_tex.png";
             File.WriteAllBytes(path, tex.EncodeToPNG());
             Object.DestroyImmediate(tex);
             AssetDatabase.ImportAsset(path);

@@ -49,6 +49,10 @@ unity run client --no-tail -l player.log -- -buildTarget Win64 -executeMethod Au
 unity run client --no-tail -l hot.log -- -buildTarget Win64 -executeMethod Automatic.Editor.Batch.BuildHotUpdate
 ```
 
+Board frame-rate test (design/08 §2): with the CDN running, `Relics.exe -bench -screen-width 1920
+-screen-height 1080 -screen-fullscreen 0 -logFile bench.log` loads `board_west` from the resource
+package, runs uncapped for 10 s and logs `[Bench]` lines, then quits.
+
 `unity run` adds `-batchmode -quit` itself; do not pass them. The player writes `[Boot]` and `[Hot]`
 lines to its log (`Relics.exe -logFile run.log`), so a run can be checked without reading the screen.
 

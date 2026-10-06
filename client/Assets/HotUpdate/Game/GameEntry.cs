@@ -16,6 +16,11 @@ namespace Automatic.Game
         public static void Start()
         {
             var package = YooAssets.GetPackage(PackageName);
+            if (BoardBench.Requested())
+            {
+                BoardBench.Run(package);
+                return;
+            }
             var cube = package.LoadAssetSync<GameObject>("HotCube").InstantiateSync();
             cube.AddComponent<Spin>();
 

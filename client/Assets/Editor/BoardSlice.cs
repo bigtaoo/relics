@@ -149,7 +149,7 @@ namespace Automatic.Editor
 
         private static AnimatorController Controller(IEnumerable<AnimationClip> clips)
         {
-            var path = ZhengDir + "zheng.controller";
+            var path = ZhengDir + "zheng_anim.controller";
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
             if (controller != null) return controller;
             controller = AnimatorController.CreateAnimatorControllerAtPath(path);
