@@ -38,7 +38,8 @@ def main(src, out):
         add_leaf_bones=False, primary_bone_axis='Y', secondary_bone_axis='X',
         bake_anim=True, bake_anim_use_all_actions=True, bake_anim_use_nla_strips=False,
         bake_anim_force_startend_keying=True, bake_anim_simplify_factor=0.0,
-        path_mode='STRIP', embed_textures=False)
+        path_mode='STRIP', embed_textures=False,
+        colors_type='SRGB')  # the parts mask is stored as raw bytes (rig_zheng.paint_parts)
     save_basecolor(arm.children, os.path.splitext(out)[0] + "_basecolor.png")
     print("FBX", out, [a.name for a in bpy.data.actions])
 

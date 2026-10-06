@@ -9,92 +9,108 @@ using UnityEngine.Rendering;
 namespace Automatic.Editor
 {
     /// <summary>
-    /// Sets up a character's toon material and renders every animation clip from the fixed
-    /// battle camera (design/04 §2) into artifacts/art_preview/, so an import can be checked headless.
+    /// Writes a character's toon material variants (ToonVariants) and renders them from the fixed
+    /// battle camera (design/04 §2) into artifacts/art_preview/: a lineup of all variants side by
+    /// side, then 5 frames of every clip per variant, so an import can be checked headless.
     /// </summary>
     public static class ArtPreview
     {
         private const string Dir = "Assets/HotRes/Art/Zheng/";
         private const int Size = 512;
         private const int FramesPerClip = 5;
+        private static readonly Quaternion CameraYaw = Quaternion.Euler(0, 135, 0);
 
         public static void Zheng()
         {
             AssetDatabase.Refresh();
-            var mat = ToonMaterial(Dir + "zheng_toon.mat", Dir + "zheng_basecolor.png");
-            var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../artifacts/art_preview"));
-            Render(Dir + "zheng.fbx", mat, outDir);
-        }
-
-        private static Material ToonMaterial(string path, string texturePath)
-        {
-            var mat = AssetDatabase.LoadAssetAtPath<Material>(path);
-            if (mat == null)
-            {
-                var shader = Shader.Find("Relics/Toon") ?? throw new Exception("Relics/Toon shader not found");
-                mat = new Material(shader);
-                AssetDatabase.CreateAsset(mat, path);
-            }
-            mat.SetTexture("_BaseMap", AssetDatabase.LoadAssetAtPath<Texture2D>(texturePath));
-            EditorUtility.SetDirty(mat);
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + "zheng_basecolor.png");
+            var mats = ToonVariants.All.Select(v => (v.Name, Mat: v.Write(Dir + "zheng_" + v.Name + ".mat", tex))).ToArray();
             AssetDatabase.SaveAssets();
-            return mat;
+            var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../artifacts/art_preview"));
+            Directory.CreateDirectory(outDir);
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(Dir + "zheng.fbx") ?? throw new Exception("missing zheng.fbx");
+            var clips = AssetDatabase.LoadAllAssetsAtPath(Dir + "zheng.fbx").OfType<AnimationClip>()
+                .Where(c => !c.name.StartsWith("__preview__")).ToArray();
+
+            NewStage();
+            var units = mats.Select(m => Spawn(model, m.Mat)).ToArray();
+            var size = Bounds(units[0]).size.x;
+            var across = CameraYaw * Vector3.right; // a row across the view, left to right in the shot
+            for (var i = 0; i < units.Length; i++)
+                units[i].transform.position = across * ((i - (units.Length - 1) / 2f) * size * 1.1f);
+            var idle = clips.First(c => c.name == "idle");
+            foreach (var u in units) idle.SampleAnimation(u, 0);
+            Shoot(units, 2048, 768, 0.55f, Path.Combine(outDir, "lineup.png"));
+
+            foreach (var (u, (name, _)) in units.Zip(mats, (u, m) => (u, m)))
+            {
+                foreach (var other in units) other.SetActive(other == u);
+                u.transform.position = Vector3.zero;
+                var dir = Path.Combine(outDir, name);
+                Directory.CreateDirectory(dir);
+                foreach (var clip in clips)
+                    for (var f = 0; f < FramesPerClip; f++)
+                    {
+                        clip.SampleAnimation(u, clip.length * f / (FramesPerClip - 1));
+                        Shoot(new[] { u }, Size, Size, 1, Path.Combine(dir, $"{clip.name}_{f}.png"));
+                    }
+                Debug.Log($"[ArtPreview] {name}: {clips.Length} clips");
+            }
         }
 
-        private static void Render(string fbxPath, Material mat, string outDir)
+        private static void NewStage()
         {
-            Directory.CreateDirectory(outDir);
             EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(fbxPath) ?? throw new Exception("missing " + fbxPath);
-            var go = UnityEngine.Object.Instantiate(model);
-            var renderers = go.GetComponentsInChildren<Renderer>();
-            foreach (var r in renderers)
-                r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
-            var bounds = renderers[0].bounds;
-            foreach (var r in renderers) bounds.Encapsulate(r.bounds);
-            Debug.Log($"[ArtPreview] {fbxPath} bounds {bounds}");
-
             var light = new GameObject("Sun").AddComponent<Light>();
             light.type = LightType.Directional;
             light.shadows = LightShadows.Soft;
             light.transform.rotation = Quaternion.Euler(50, -30, 0);
             RenderSettings.ambientMode = AmbientMode.Flat;
             RenderSettings.ambientLight = new Color(0.55f, 0.55f, 0.6f);
+        }
 
-            // Battle camera: fixed oblique top-down view, unit seen from the front-left.
+        private static GameObject Spawn(GameObject model, Material mat)
+        {
+            var go = UnityEngine.Object.Instantiate(model);
+            foreach (var r in go.GetComponentsInChildren<Renderer>())
+                r.sharedMaterials = Enumerable.Repeat(mat, r.sharedMaterials.Length).ToArray();
+            return go;
+        }
+
+        private static Bounds Bounds(GameObject go)
+        {
+            var rs = go.GetComponentsInChildren<Renderer>();
+            var b = rs[0].bounds;
+            foreach (var r in rs) b.Encapsulate(r.bounds);
+            return b;
+        }
+
+        /// <summary>Battle camera: fixed oblique top-down view, units seen from the front-left.</summary>
+        private static void Shoot(GameObject[] targets, int w, int h, float distance, string file)
+        {
+            var b = Bounds(targets[0]);
+            foreach (var t in targets) b.Encapsulate(Bounds(t));
             var cam = new GameObject("Camera").AddComponent<Camera>();
             cam.clearFlags = CameraClearFlags.SolidColor;
             cam.backgroundColor = new Color(0.86f, 0.84f, 0.78f);
             cam.fieldOfView = 30;
-            var target = bounds.center;
-            cam.transform.position = target + Quaternion.Euler(40, 135, 0) * Vector3.back * (bounds.extents.magnitude * 3.2f);
-            cam.transform.LookAt(target);
-            var rt = new RenderTexture(Size, Size, 24) { antiAliasing = 4 };
+            cam.aspect = (float)w / h;
+            cam.transform.position = b.center + CameraYaw * Quaternion.Euler(40, 0, 0) * Vector3.back * (b.extents.magnitude * 3.2f * distance);
+            cam.transform.LookAt(b.center);
+            var rt = new RenderTexture(w, h, 24) { antiAliasing = 4 };
             cam.targetTexture = rt;
+            cam.Render();
 
-            var clips = AssetDatabase.LoadAllAssetsAtPath(fbxPath).OfType<AnimationClip>()
-                .Where(c => !c.name.StartsWith("__preview__")).ToArray();
-            foreach (var clip in clips)
-            {
-                for (var i = 0; i < FramesPerClip; i++)
-                {
-                    clip.SampleAnimation(go, clip.length * i / (FramesPerClip - 1));
-                    cam.Render();
-                    Save(rt, Path.Combine(outDir, $"{clip.name}_{i}.png"));
-                }
-                Debug.Log($"[ArtPreview] clip {clip.name} {clip.length:0.00}s loop={clip.isLooping}");
-            }
-        }
-
-        private static void Save(RenderTexture rt, string file)
-        {
             var prev = RenderTexture.active;
             RenderTexture.active = rt;
-            var tex = new Texture2D(rt.width, rt.height, TextureFormat.RGB24, false);
-            tex.ReadPixels(new Rect(0, 0, rt.width, rt.height), 0, 0);
+            var tex = new Texture2D(w, h, TextureFormat.RGB24, false);
+            tex.ReadPixels(new Rect(0, 0, w, h), 0, 0);
             RenderTexture.active = prev;
             File.WriteAllBytes(file, tex.EncodeToPNG());
             UnityEngine.Object.DestroyImmediate(tex);
+            cam.targetTexture = null;
+            UnityEngine.Object.DestroyImmediate(rt);
+            UnityEngine.Object.DestroyImmediate(cam.gameObject);
         }
     }
 }

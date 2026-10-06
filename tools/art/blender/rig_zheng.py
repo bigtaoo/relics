@@ -4,6 +4,8 @@
 # orthographic renders and mesh slices of toon_v1.glb (see art/zheng/model/README.md).
 import bpy, bmesh, sys
 from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+from mathutils.kdtree import KDTree
 
 # name: (head, tail, parent, deform)
 BONES = {
@@ -43,6 +45,59 @@ VOXEL = 0.08  # proxy resolution at bind scale; small enough to keep tails and l
 for t, pts in enumerate(TAILS, 1):
     for i in range(len(pts) - 1):
         BONES[f"tail{t}.{i + 1}"] = (pts[i], pts[i + 1], "hips" if i == 0 else f"tail{t}.{i}", True)
+
+
+WHISKER_VOXEL = 0.01  # glb scale; coarse enough that whiskers vanish from the remesh
+WHISKER_TIP = 0.02  # vertices this far outside the remesh seed the whisker selection
+WHISKER_GROW = 0.004  # the selection grows along the mesh while still this far outside
+WHISKER_MAX_Z = 0.2  # the horn tip is thin too; keep it
+
+
+def remove_whiskers(mesh):
+    """Tripo models the whiskers as hair-thin tubes that render as floating sticks under the
+    toon outline. Compare the mesh with a coarse voxel remesh of itself: whisker tips stick
+    out of it, and flood-filling from the tips while staying outside picks the rest."""
+    proxy = mesh.copy()
+    proxy.data = mesh.data.copy()
+    bpy.context.scene.collection.objects.link(proxy)
+    rm = proxy.modifiers.new("remesh", 'REMESH')
+    rm.mode, rm.voxel_size = 'VOXEL', WHISKER_VOXEL
+    pb = bmesh.new()
+    pb.from_object(proxy, bpy.context.evaluated_depsgraph_get())
+    tree = BVHTree.FromBMesh(pb)
+    pb.free()
+    bpy.data.objects.remove(proxy)
+
+    def outside(co):
+        loc, n, _, d = tree.find_nearest(co)
+        return d if (co - loc).dot(n) > 0 else -d
+
+    # glb meshes are split at UV seams; weld a copy for connectivity, map back by position.
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    seeds = [v for v in bm.verts if v.co.z < WHISKER_MAX_Z and outside(v.co) > WHISKER_TIP]
+    sel, stack = set(seeds), list(seeds)
+    while stack:
+        v = stack.pop()
+        for e in v.link_edges:
+            o = e.other_vert(v)
+            if o not in sel and outside(o.co) > WHISKER_GROW:
+                sel.add(o)
+                stack.append(o)
+    kd = KDTree(len(sel))
+    for i, v in enumerate(sel):
+        kd.insert(v.co, i)
+    kd.balance()
+    bm.free()
+
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    doomed = [v for v in bm.verts if sel and kd.find(v.co)[2] < 1e-5]
+    bmesh.ops.delete(bm, geom=doomed, context='VERTS')
+    bm.to_mesh(mesh.data)
+    bm.free()
+    print("WHISKERS seeds", len(seeds), "removed verts", len(doomed))
 
 
 def keep_largest_island(obj):
@@ -108,6 +163,19 @@ def bind(mesh, arm):
     bpy.data.objects.remove(proxy)
 
 
+def paint_parts(mesh):
+    """Body-part masks for the toon shader's material variants, from the skin weights:
+    R = position along the tail (0 root, 1 tip), G = tail, B = horn."""
+    tails = {mesh.vertex_groups[f"tail{t}.{i}"].index: (i - 0.5) / 4 for t in range(1, 6) for i in range(1, 5)}
+    horn = mesh.vertex_groups["horn"].index
+    attr = mesh.data.color_attributes.new("parts", 'BYTE_COLOR', 'POINT')
+    for v in mesh.data.vertices:
+        tail = sum(g.weight for g in v.groups if g.group in tails)
+        pos = sum(g.weight * tails[g.group] for g in v.groups if g.group in tails) / tail if tail else 0
+        h = sum(g.weight for g in v.groups if g.group == horn)
+        attr.data[v.index].color_srgb = (pos, min(tail, 1), min(h, 1), 1)
+
+
 def build(src, out):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=src)
@@ -119,6 +187,8 @@ def build(src, out):
     bpy.context.view_layer.objects.active = mesh
     if mesh.parent:
         bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
+    bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
+    remove_whiskers(mesh)
     mesh.scale = (BIND_SCALE,) * 3
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     for o in list(bpy.context.scene.objects):
@@ -148,7 +218,8 @@ def build(src, out):
         o.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    empty = [g.name for g in mesh.vertex_groups
+    paint_parts(mesh)
+    empty =[g.name for g in mesh.vertex_groups
              if not any(g.index in [e.group for e in v.groups if e.weight > 0.01] for v in mesh.data.vertices)]
     bpy.context.view_layer.update()
     ws = [mesh.matrix_world @ v.co for v in mesh.data.vertices]

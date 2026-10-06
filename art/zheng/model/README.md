@@ -71,6 +71,29 @@ B="/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"; M=D:/automatic/
 
 Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZheng`，导入规则在 `client/Assets/Editor/ArtPostprocessor.cs`，着色器 `client/Assets/HotRes/Shaders/Toon.shader`，每个动作 5 帧截图输出到 `artifacts/art_preview/`，汇总图 `zheng_unity.sheet.png`。
 
+## 2026-10-06 删胡须 + 材质变体
+
+**胡须**：Tripo 把胡须做成头发丝粗细的管子，挂在脸上（焊接 UV 接缝后和身体是同一块网格，按碎块删不掉），在 Unity 描边下变成黑色细棍。`rig_zheng.py` 的 `remove_whiskers`：
+- 用 0.01 体素重构一份粗外壳，胡须太细，不会进入外壳。
+- 离外壳 > 0.02 的顶点当种子（胡须尖），沿网格往回扩，只要还在外壳外 0.004 以上就算胡须。
+- z > 0.2 的不算（角尖也细，要保留）。结果删掉 238 个顶点，阈值在 0.002–0.008 间结果稳定，不会扩进脸里。
+
+**材质**：一张贴图出 5 套（`client/Assets/Editor/ToonVariants.cs` 是参数表，生成 `zheng_<名>.mat`）：
+
+| 名称 | 用途 | 做法 |
+|---|---|---|
+| pottery | 1 档：彩陶 | 赤陶底 + 深褐彩绘斑，哑光，弱边缘光 |
+| bronze | 2 档：青铜 | 原贴图不重着色，加小高光 |
+| jade | 3 档：玉 | 浅玉绿 + 深绿斑，亮阴影 + 强边缘光，显得通透 |
+| gold | 4 档：鎏金 | 亮黄金 + 深金斑，硬高光 |
+| living | 活体态 | 赤橙豹身 + 黑斑，金角，尾巴从青绿到橙黄渐变并发光 |
+
+- `Relics/Toon` 的重着色：铜绿斑点按「绿 > 红」识别成遮罩，亮度除以身体 / 斑点的中位亮度作为明暗细节，颜色全部来自材质参数。
+- 尾巴和角的遮罩来自绑定权重，烘进顶点色（`paint_parts`：R = 沿尾巴的位置，G = 尾巴，B = 角），FBX 按原始字节导出。
+- 坑：材质颜色要按青铜贴图的亮度来定（身体线性亮度约 0.19），第一版颜色直接按概念图取，全部过曝发白。
+
+效果：`zheng_variants.png`（左到右：陶、青铜、玉、金、活体），活体态 6 个动作 `zheng_living.sheet.png`，青铜态 `zheng_unity.sheet.png`。战斗镜头下 5 套一眼能分开；活体态的火焰尾巴只是颜色渐变 + 自发光，没有动态火焰，正式版要靠特效补。
+
 ## 第 2 轮结论
 
 - **从概念图到 Unity 里卡通着色、带 6 个动作的角色，全程脚本化，可重跑**：图生 3D 约 3 分钟，绑定 + 动作 + 导出约 1 分钟，花费 30 积分（$0.30）。

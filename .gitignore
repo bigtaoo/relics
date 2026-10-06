@@ -32,3 +32,6 @@ client/Assets/HotRes/Dlls/
 client/Assets/HotRes/Dlls.meta
 client/Assets/StreamingAssets/
 client/Assets/StreamingAssets.meta
+
+# Blender save backups
+*.blend1

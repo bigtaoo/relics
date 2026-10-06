@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: zheng_toon
+  m_Name: zheng_bronze
   m_Shader: {fileID: 4800000, guid: 955dc9b5d89a7f744bad3002d3c7df02, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -30,14 +30,23 @@ Material:
     m_Ints: []
     m_Floats:
     - _OutlineWidth: 0.006
+    - _Recolor: 0
     - _RimPower: 4
     - _RimStrength: 0.35
     - _ShadeSoftness: 0.04
     - _ShadeThreshold: 0.05
+    - _SpecSize: 0.06
+    - _TailGlow: 0
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BodyColor: {r: 0, g: 0, b: 0, a: 0}
+    - _HornColor: {r: 0, g: 0, b: 0, a: 0}
     - _OutlineColor: {r: 0.13, g: 0.09, b: 0.05, a: 1}
     - _RimColor: {r: 1, g: 0.92, b: 0.7, a: 1}
     - _ShadeColor: {r: 0.55, g: 0.5, b: 0.62, a: 1}
+    - _SpecColor: {r: 0.5, g: 0.42, b: 0.25, a: 1}
+    - _SpotColor: {r: 0, g: 0, b: 0, a: 0}
+    - _TailRootColor: {r: 0, g: 0, b: 0, a: 0}
+    - _TailTipColor: {r: 0, g: 0, b: 0, a: 0}
   m_BuildTextureStacks: []
   m_AllowLocking: 1
