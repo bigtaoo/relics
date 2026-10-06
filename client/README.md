@@ -34,7 +34,12 @@ artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-h
 ```
 
 `-autoplay <dir>` runs it by itself and saves screenshots along the timeline as raw RGB24 (the
-player has no image encoder module), then quits.
+player has no image encoder module), then quits. To check that something moves, diff two
+frames of the same phase (e.g. `0.0` and `0.3`, both before the click lands).
+
+Art in `Assets/HotRes/` (models, clips, prefabs) only needs `BuildHotUpdate`; the player picks up
+the new version on its next start. Player settings stay as built: `runInBackground` is on, since
+an unfocused player otherwise pauses at `[Boot] Initializing`.
 
 ## Hot update minimal validation (design/07 §7)
 
