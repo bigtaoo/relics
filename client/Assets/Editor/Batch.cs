@@ -35,6 +35,8 @@ namespace Automatic.Editor
             HotUpdateBuild.Build(target, HotUpdateBuild.NextVersion(target), EBundledCopyOption.None);
         });
 
+        public static void ArtPreviewZheng() => Run(ArtPreview.Zheng);
+
         private static void Run(Action action)
         {
             try

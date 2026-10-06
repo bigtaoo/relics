@@ -52,8 +52,9 @@
 | `living_v3.png` | 编辑 toon_a，`living_fix2.txt`（「其余像素不变」） | 五尾正确、普通豹尾去掉，但两只角都没了 |
 | `living_v4.png` | 编辑 v3 加角，`living_horn_fix.txt` | **活体态候选**：一角、五尾。角偏长 |
 | `transition_v1.png` | 编辑 v4，`transition_fix.txt` | 尾巴又丢了，几乎全身青铜 + 裂纹，质感偏写实，不合格 |
-| 器物态 | 编辑 v4，`artifact_fix.txt` | 未出：5 个 key 全部被限流 15 分钟以上，等配额恢复后重跑 |
+| `artifact_v1.png` | 编辑 v4，`artifact_fix.txt`（key F） | **器物态定稿**：一角、五条实心尾巴、单一青铜材质带铜绿斑、无底座。瑕疵：眼睛没闭上、胡须太细（3D 里成了游离碎片）。直接用于图生 3D |
 
 经验（补充）：
 - 编辑时写「Keep EVERYTHING else pixel-identical」比「Keep the same…」更能守住其余部分。
 - 半透明的火焰尾巴在换材质的编辑里很容易被整个删掉；器物态要让尾巴是实心的造型，这样图生 3D 也才能做出来。
+- A–E 五个 key 的免费额度用完后，新增 F、G 两个 workspace：每个 key 要在自己的 workspace 里建一个带 `image_generation` 工具的 agent（`POST /v1/agents`），agent id 写进两个脚本的 case 表。

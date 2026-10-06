@@ -31,6 +31,7 @@
 - 2026-10-06 概念图第 1 轮完成：器物态、活体态、过渡态各 1 张，用 Mistral 出图（流程沿用 standing，脚本在 `tools/art/`）。结果、提示词和经验见 `art/zheng/concept/README.md`。
 - 2026-10-06 Tripo API 试验：图生 3D 可用（2 万面带 PBR，$0.30/次，概念图需去掉底座）；自动绑定给五尾都建了骨骼链，但头、腿、尾识别错乱，walk 预设因此错位；非人形只有 walk 一个预设动作。结论：模型用 Tripo，骨骼修正和 6 个动作要进 Blender。记录见 `art/zheng/model/README.md`。
 - 2026-10-06 风格改为卡通（04 §3）：第 1 轮写实概念图和 Tripo 模型只作流程参考，概念图按卡通风格重出（第 2 轮，`art/zheng/concept/r2/`）。Blender 5.2 已装，用于修骨骼和做动作；模型文件（glb / fbx / blend）走 Git LFS。
+- 2026-10-06 卡通版跑通到 FBX：器物态概念图（`concept/r2/artifact_v1.png`）→ Tripo 图生 3D（30 积分）→ Blender 脚本绑定（39 骨，四足 + 五尾链，体素代理算自动权重）→ 程序化 6 个动作 → FBX 进 `client/Assets/HotRes/Art/Zheng/`。脚本在 `tools/art/blender/`，过程和坑见 `art/zheng/model/README.md`。Unity 侧已跑通：导入规则（Generic、动作名、idle 循环）、`Relics/Toon` 卡通着色 + 描边、无头截图脚本（`Batch.ArtPreviewZheng`），截图 `art/zheng/model/zheng_unity.sheet.png`。遗留：胡须变成游离的黑色细棍，要在模型里删掉。
 
 ## 2. 场景：一块棋盘
 
