@@ -18,6 +18,7 @@ namespace Automatic.Editor
     /// framing of the whole table (04 §2) as the opponent's pieces arrive. Renders into
     /// artifacts/ui/: a still per target aspect ratio (08 §6) and the hu and battle-start
     /// sequence frames; tools/ui/ui_media.py makes the review media in art/ui/.
+    /// The playable demo (HotUpdate/Game/ShopDemo.cs, HuShowUi.cs) runs the same timeline: keep the times in step.
     /// </summary>
     public static class UiSlice
     {

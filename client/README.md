@@ -23,9 +23,25 @@ modules later), Visual Studio with the *Desktop development with C++* workload (
 3. `Automatic/1. Setup Project` (idempotent): player settings, HybridCLR settings, URP, `HotCube`
    prefab and material, YooAsset collector, boot scene.
 
+## Shop demo (design/08 §3)
+
+`Relics.exe` (and Play on `Assets/Boot/Boot.unity` in the editor) starts the playable UI slice:
+the board in the preparation phase with the shop. Click the glowing card to play the hu show and
+the battle start; click again or press R to start over, Esc quits. With the CDN running (below):
+
+```bash
+artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-height 900
+```
+
+`-autoplay <dir>` runs it by itself and saves screenshots along the timeline as raw RGB24 (the
+player has no image encoder module), then quits.
+
 ## Hot update minimal validation (design/07 §7)
 
-1. Editor: open `Assets/Boot/Boot.unity`, Play. Expect a spinning bronze cube and all `PASS` lines.
+The check below now needs `-hotcheck` on the player command line (the default start is the demo).
+
+1. Editor: open `Assets/Boot/Boot.unity`, Play. Expect a spinning bronze cube and all `PASS` lines
+   (temporarily route `GameEntry.Start` to the check: the editor has no `-hotcheck` switch).
 2. `Automatic/3. Build Player` (Windows). Output `artifacts/player/PC/Relics.exe`, resources
    published to `artifacts/cdn/PC/`.
 3. Serve the CDN from the repo root:
@@ -34,9 +50,9 @@ modules later), Visual Studio with the *Desktop development with C++* workload (
    python -m http.server 8000 --directory artifacts/cdn
    ```
 
-4. Run `Relics.exe`: same cube, all `PASS` (now inside the HybridCLR interpreter).
+4. Run `Relics.exe -hotcheck`: same cube, all `PASS` (now inside the HybridCLR interpreter).
 5. Change `GameEntry.BuildLabel` and the color of `Assets/HotRes/Bronze.mat`, then
-   `Automatic/2. Build Hot Update`. Restart `Relics.exe` without rebuilding it: new label and color.
+   `Automatic/2. Build Hot Update`. Restart `Relics.exe -hotcheck` without rebuilding it: new label and color.
 
 ## Headless (Unity CLI)
 

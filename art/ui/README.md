@@ -16,6 +16,10 @@
   - 两份字体。
 - 胡牌演出复用 §1 的棋盘特效。为此把 FxSlice 的时间轴抽成了共用的 `FxTimeline.cs`，UI 和棋盘特效在同一条时间轴上逐帧推进。
 
+**可玩 Demo**：`Relics.exe` 默认进入这段演示，可以自己点。代码在 `client/Assets/HotUpdate/Game/`，`ShopDemo.cs` 管棋盘和时间轴，`HuShowUi.cs` 管 UI 动效，`DemoFraming.cs` 算两个镜头取景。这些代码和编辑器里的 `UiSlice` / `FxTimeline` 用同一组时间常数，改一边要同步改另一边。
+- 运行时粒子按真实时间播放，不像编辑器那样逐帧推进，所以每次看到的粒子细节会略有不同。
+- 只有「毕方」卡能点。刷新、锁定、升级这些按钮都还没接逻辑。
+
 ## 1. 商店 + 听牌（准备阶段）
 
 ![pc](shop_pc_16x9.jpg)

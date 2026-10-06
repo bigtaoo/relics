@@ -1,3 +1,4 @@
+using System.Linq;
 using UnityEngine;
 using YooAsset;
 
@@ -5,6 +6,8 @@ namespace Automatic.Game
 {
     /// <summary>
     /// Hot layer entry point, called by the AOT shell via reflection (design/07 §2).
+    /// Default: the playable shop demo (08 §3); -bench: board frame-rate test; -hotcheck: the
+    /// hot-update check (cube and golden battle, 07 §7).
     /// </summary>
     public static class GameEntry
     {
@@ -19,6 +22,11 @@ namespace Automatic.Game
             if (BoardBench.Requested())
             {
                 BoardBench.Run(package);
+                return;
+            }
+            if (!System.Environment.GetCommandLineArgs().Contains("-hotcheck"))
+            {
+                ShopDemo.Run(package);
                 return;
             }
             var cube = package.LoadAssetSync<GameObject>("HotCube").InstantiateSync();

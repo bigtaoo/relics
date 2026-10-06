@@ -1,0 +1,5 @@
+<linker>
+  <!-- UI components live only in hot-update prefabs and hot code; keep them in the AOT shell whole. -->
+  <assembly fullname="UnityEngine.UI" preserve="all" />
+  <assembly fullname="Unity.TextMeshPro" preserve="all" />
+</linker>

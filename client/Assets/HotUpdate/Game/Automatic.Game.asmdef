@@ -1,7 +1,7 @@
 {
   "name": "Automatic.Game",
   "rootNamespace": "Automatic.Game",
-  "references": ["Automatic.Battle.Core", "YooAsset"],
+  "references": ["Automatic.Battle.Core", "YooAsset", "Unity.TextMeshPro", "UnityEngine.UI"],
   "includePlatforms": [],
   "excludePlatforms": [],
   "allowUnsafeCode": false,
