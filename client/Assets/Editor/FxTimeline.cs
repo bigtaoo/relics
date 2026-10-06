@@ -51,7 +51,7 @@ namespace Automatic.Editor
             foreach (var (unit, clip, start) in Anims)
             {
                 var c = clips[clip];
-                if (t < start) c.SampleAnimation(unit.Model, 0);
+                if (t < start) clips["idle"].SampleAnimation(unit.Model, t % clips["idle"].length); // idles until its clip starts
                 else if (t - start <= c.length) c.SampleAnimation(unit.Model, t - start);
                 else clips["idle"].SampleAnimation(unit.Model, (t - start - c.length) % clips["idle"].length);
             }
@@ -121,8 +121,8 @@ namespace Automatic.Editor
 
         /// <summary>
         /// Preparation phase: only the player's side, no acting unit, no health bars, every piece an
-        /// artifact of its cost tier at rest (first frame of `awaken`); the board scene is saved in
-        /// the battle phase, where the formed hand is already living.
+        /// artifact of its cost tier, idling out of step with its neighbours (pieces always move);
+        /// the board scene is saved in the battle phase, where the formed hand is already living.
         /// </summary>
         public void PrepPhase(List<SliceUnit> units)
         {
@@ -132,7 +132,7 @@ namespace Automatic.Editor
                 t.gameObject.SetActive(false);
             var mine = units.Where(u => u.Root.gameObject.activeSelf).ToList();
             foreach (var u in mine) Wear(u, Variant(BoardSlice.TierOf(u.Root)));
-            Anims.AddRange(mine.Select(u => (u, "awaken", 1e6f)));
+            Anims.AddRange(mine.Select((u, i) => (u, "idle", -(i * 1.37f % 4))));
         }
 
         /// <summary>The example hand: five cells of the player's half forming a ring, linked in this order.</summary>

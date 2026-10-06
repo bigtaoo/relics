@@ -97,13 +97,24 @@ def bump(a, m, b, t):
 
 
 def idle(t):
+    """4 s loop, big enough to read from the whole-table camera: two breaths with a body bob,
+    one weight shift side to side, the head looking left and right, a front paw tap, tails
+    swaying and fanning. Every term is periodic in t, so the loop is seamless."""
     p = {}
-    br = math.sin(2 * math.pi * t)
-    add(p, "chest", Y, 2 * br)
-    add(p, "neck", Y, -2 * br)
-    add(p, "head", Y, 3 * math.sin(2 * math.pi * t + 0.8))
-    tails_wave(p, t, amp=7)
-    return p, (0, 0, 0.004 * br)
+    br = math.sin(2 * math.pi * 2 * t)
+    sway = math.sin(2 * math.pi * t)
+    add(p, "chest", Y, 6 * br)
+    add(p, "neck", Y, -4 * br)
+    add(p, "hips", X, 4 * sway)
+    add(p, "chest", X, -4 * sway)
+    add(p, "head", Z, 20 * math.sin(2 * math.pi * t + 0.6))
+    add(p, "head", Y, 7 * math.sin(2 * math.pi * 2 * t + 0.8))
+    tap = bump(0.55, 0.63, 0.72, t)
+    add(p, "upperarm.L", Y, -22 * tap)
+    add(p, "forearm.L", Y, 45 * tap)
+    fan = math.sin(2 * math.pi * t + 1.5)
+    tails_wave(p, t, amp=16, speed=2, spread=10 + 10 * fan, lift=-6 * fan)
+    return p, (0, 0.012 * sway, 0.014 * (br + 1) / 2)
 
 
 def attack(t):
@@ -184,7 +195,7 @@ def awaken(t):
     return p, (0, 0, 0.03 * rise)
 
 
-CLIPS = [("idle", 2.0, idle, True), ("attack", 1.0, attack, False), ("cast", 1.5, cast, False),
+CLIPS = [("idle", 4.0, idle, True), ("attack", 1.0, attack, False), ("cast", 1.5, cast, False),
          ("hit", 0.5, hit, False), ("death", 1.5, death, False), ("awaken", 2.0, awaken, False)]
 
 

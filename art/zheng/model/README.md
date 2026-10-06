@@ -48,7 +48,7 @@
 |---|---|---|---|
 | `toon_v1` 图生 3D | Tripo，`concept/r2/artifact_v1.png`（本身无底座），参数同 gen_v2 | 一角、五尾、四腿都对，19539 三角面，1 个材质。预览 `toon_v1.preview.png` | 30 积分（余 475） |
 | 绑定 `zheng_rig.blend` | `tools/art/blender/rig_zheng.py` | 39 根骨骼：root + 脊柱 5 + 角 + 四腿各 3 + 五尾各 4。自动权重，38 个变形骨骼全部有权重。检查图 `zheng_rig.posetest.png`：单独弯每条尾巴只动那一条 | 0 |
-| 动作 `zheng_anim.blend` | `tools/art/blender/anim_zheng.py`，程序化关键帧 | 待机（2 秒循环）、攻击、施法、受击、死亡、觉醒，共 6 个。检查图 `zheng_anim.sheet.png` | 0 |
+| 动作 `zheng_anim.blend` | `tools/art/blender/anim_zheng.py`，程序化关键帧 | 待机（4 秒循环，2026-10-06 加大幅度，见 04 §6）、攻击、施法、受击、死亡、觉醒，共 6 个。检查图 `zheng_anim.sheet.png` | 0 |
 | 导出 | `tools/art/blender/export_fbx.py` | `client/Assets/HotRes/Art/Zheng/zheng.fbx`（6 个 take）+ `zheng_basecolor.png`。回导 Blender 验证：骨骼、动作、蒙皮都在 | 0 |
 
 命令（仓库根目录，`B` 是 Blender 路径）：

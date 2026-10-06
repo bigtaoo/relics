@@ -181,7 +181,7 @@ ModelImporter:
       takeName: rig|idle
       internalID: 1599155768152908184
       firstFrame: 0
-      lastFrame: 60
+      lastFrame: 120
       wrapMode: 0
       orientationOffsetY: 0
       level: 0

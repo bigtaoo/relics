@@ -145,14 +145,15 @@ namespace Automatic.Game
             halfDepth = table.extents.z;
             prepTop = enemyAt.Min(p => p.z) - 0.1f; // the far bank of the river
 
-            // Preparation phase: only the player's side, every piece an artifact of its tier at rest.
+            // Preparation phase: only the player's side, every piece an artifact of its tier. Pieces
+            // always move, artifacts too (only the material tells them apart); each idles out of
+            // step with its neighbours so the board never looks frozen.
             foreach (var u in enemies) u.Root.gameObject.SetActive(false);
             foreach (var m in markers) m.gameObject.SetActive(false);
             foreach (var u in allies)
             {
                 Wear(u, tiers[u.Tier]);
-                u.Animator.Play("awaken", 0, 0);
-                u.Animator.speed = 0;
+                Play(u, "idle", Random.value);
             }
 
             var canvas = new GameObject("Hud", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
@@ -199,7 +200,7 @@ namespace Automatic.Game
                 var at = HuShowUi.Board + HuShowUi.LightAt(i);
                 events.Add((at, () =>
                 {
-                    Play(u, "awaken", 0);
+                    u.Animator.CrossFade("awaken", 0.12f, 0, 0);
                     Spawn(HuPiece, u.Root.position);
                 }));
                 events.Add((at + 0.1f, () => Wear(u, living)));
@@ -212,10 +213,6 @@ namespace Automatic.Game
             events.Add((HuShowUi.Board + HuShowUi.LightAt(hand.Count - 1) + 0.1f, () => Link(hand[^1].Root.position, hand[0].Root.position)));
             var centre = hand.Aggregate(Vector3.zero, (s, u) => s + u.Root.position) / hand.Count;
             events.Add((HuShowUi.Board + HuShowUi.SealAt(hand.Count), () => Spawn(HuSeal, centre)));
-            events.Add((HuShowUi.Arrive, () =>
-            {
-                foreach (var u in allies.Except(hand)) Play(u, "idle", Random.value);
-            }));
             events.Add((HuShowUi.Bars, () =>
             {
                 foreach (var m in markers) m.gameObject.SetActive(true);
@@ -280,7 +277,7 @@ namespace Automatic.Game
         private static void Play(Unit u, string clip, float at)
         {
             u.Started = true;
-            u.Animator.speed = 1;
+            u.Animator.speed = Random.Range(0.9f, 1.1f);
             u.Animator.Play(clip, 0, at);
         }
 
