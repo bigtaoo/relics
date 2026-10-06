@@ -1,0 +1,5 @@
+Keep exactly the same beast, the same chunky shapes, the same pose, the same camera, the same tail shapes and the same stone base. Make only these changes:
+- Change the whole beast and all tails to ONE material: matte old cast bronze, warm brown-gold metal with green verdigris patina in the recesses and polished bronze on raised edges. No red, no paint, no lacquer.
+- Keep the engraved cloud-scroll patterns, now as engravings in the bronze.
+- Remove the leftmost tail so there are exactly five tails.
+- Plain pure white background, no text.

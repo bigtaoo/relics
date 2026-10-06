@@ -1,0 +1,3 @@
+Small cleanup edit. Keep EVERYTHING else pixel-identical: the same leopard, the same pose, the same five green-and-gold flame plumes behind the back, the same style and camera.
+- The thin spotted curly tail at the lower right (curling next to the back leg) is erased and replaced by plain white background.
+- The small second horn on the left of the head is erased; only the big golden horn in the middle stays.

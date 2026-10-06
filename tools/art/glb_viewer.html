@@ -1,0 +1,97 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>GLB Viewer</title>
+<style>
+  body { margin: 0; background: #2b2b2b; color: #ddd; font: 13px sans-serif; overflow: hidden; }
+  #ui { position: absolute; top: 8px; left: 8px; background: #000a; padding: 8px; max-height: 95vh; overflow: auto; }
+  #ui label { display: block; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<div id="ui">
+  <div id="info"></div>
+  <label><input type="checkbox" id="bones" checked> bones</label>
+  <label><input type="checkbox" id="mesh" checked> mesh</label>
+  <label><input type="checkbox" id="xray"> x-ray</label>
+  <label>view <select id="view"><option>game</option><option>side</option><option>top</option><option>back</option></select></label>
+  <label>weights of <select id="weight"><option value="-1">(off)</option></select></label>
+</div>
+<script type="module">
+// Usage: glb_viewer.html?f=<path to .glb relative to this server>
+// Shows mesh, skeleton, the first animation, and per-bone skin weights for checking auto-rigs.
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const file = new URLSearchParams(location.search).get('f');
+const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x2b2b2b);
+scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 2.5));
+const sun = new THREE.DirectionalLight(0xffffff, 2); sun.position.set(2, 4, 3); scene.add(sun);
+const camera = new THREE.PerspectiveCamera(35, innerWidth / innerHeight, 0.01, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+const clock = new THREE.Clock();
+let mixer, skinned = [], helper, center = new THREE.Vector3(), radius = 1;
+
+function setView(v) {
+  const d = radius * 2.6;
+  const dir = { game: [0.6, 1, 1], side: [0, 0, 1], top: [0, 1, 0.001], back: [-1, 0.3, 0] }[v];
+  camera.position.copy(center).add(new THREE.Vector3(...dir).normalize().multiplyScalar(d));
+  controls.target.copy(center); controls.update();
+}
+
+new GLTFLoader().load(file, gltf => {
+  const root = gltf.scene; scene.add(root);
+  const box = new THREE.Box3().setFromObject(root);
+  box.getCenter(center); radius = box.getSize(new THREE.Vector3()).length() / 2;
+  root.traverse(o => { if (o.isSkinnedMesh) skinned.push(o); });
+  helper = new THREE.SkeletonHelper(root); helper.material.depthTest = false; helper.material.linewidth = 2;
+  scene.add(helper);
+  if (gltf.animations.length) { mixer = new THREE.AnimationMixer(root); mixer.clipAction(gltf.animations[0]).play(); }
+  const bones = skinned[0]?.skeleton.bones ?? [];
+  const sel = document.getElementById('weight');
+  bones.forEach((b, i) => sel.add(new Option(b.name, i)));
+  document.getElementById('info').innerHTML =
+    `${file}<br>bones ${bones.length}, anims ${gltf.animations.map(a => a.name + ' ' + a.duration.toFixed(2) + 's').join(', ') || 'none'}`;
+  setView('game');
+  window.viewerReady = true;
+});
+
+// Weight view: colour every vertex by its weight for the selected bone (red = 1).
+const origMats = new Map();
+document.getElementById('weight').onchange = e => {
+  const bi = +e.target.value;
+  for (const m of skinned) {
+    if (!origMats.has(m)) origMats.set(m, m.material);
+    if (bi < 0) { m.material = origMats.get(m); continue; }
+    const g = m.geometry, si = g.attributes.skinIndex, sw = g.attributes.skinWeight;
+    const col = new Float32Array(si.count * 3);
+    for (let v = 0; v < si.count; v++) {
+      let w = 0;
+      for (let k = 0; k < 4; k++) if (si.getComponent(v, k) === bi) w += sw.getComponent(v, k);
+      col.set([0.15 + 0.85 * w, 0.15, 0.15 + 0.6 * (1 - w)], v * 3);
+    }
+    g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    m.material = new THREE.MeshLambertMaterial({ vertexColors: true });
+  }
+};
+document.getElementById('bones').onchange = e => helper.visible = e.target.checked;
+document.getElementById('mesh').onchange = e => skinned.forEach(m => m.visible = e.target.checked);
+document.getElementById('xray').onchange = e => skinned.forEach(m => { m.material.transparent = e.target.checked; m.material.opacity = e.target.checked ? 0.35 : 1; });
+document.getElementById('view').onchange = e => setView(e.target.value);
+addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+renderer.setAnimationLoop(() => { mixer?.update(clock.getDelta()); controls.update(); renderer.render(scene, camera); });
+</script>
+</body>
+</html>

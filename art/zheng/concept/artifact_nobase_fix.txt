@@ -1,0 +1,4 @@
+Keep exactly the same bronze beast, the same pose, the same five tails, the same bronze material, the same camera angle. Make only these changes:
+- Remove the round base completely. The beast stands with its four paws directly on nothing, floating on a plain pure white background.
+- All four legs and paws fully visible and clearly separated from each other.
+- Plain pure white background, no shadow, no text.
