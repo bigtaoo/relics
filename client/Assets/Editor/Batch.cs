@@ -41,6 +41,8 @@ namespace Automatic.Editor
 
         public static void FxSlice() => Run(Automatic.Editor.FxSlice.Build);
 
+        public static void UiSlice() => Run(Automatic.Editor.UiSlice.Build);
+
         private static void Run(Action action)
         {
             try
