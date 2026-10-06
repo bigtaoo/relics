@@ -1,0 +1,9 @@
+<Project>
+  <PropertyGroup>
+    <!-- All bin/obj go to /artifacts so Unity never imports build output from src/Battle.Core. -->
+    <UseArtifactsOutput>true</UseArtifactsOutput>
+    <Nullable>enable</Nullable>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <ImplicitUsings>disable</ImplicitUsings>
+  </PropertyGroup>
+</Project>

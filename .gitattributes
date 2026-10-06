@@ -1,0 +1,12 @@
+* text=auto eol=lf
+*.cs text eol=lf
+*.md text eol=lf
+*.sln text eol=crlf
+*.png binary
+*.jpg binary
+*.fbx binary
+*.psd binary
+*.unity text eol=lf merge=unityyamlmerge
+*.prefab text eol=lf merge=unityyamlmerge
+*.asset text eol=lf merge=unityyamlmerge
+*.meta text eol=lf

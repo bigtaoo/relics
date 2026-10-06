@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Deterministic battle core shared by the Unity client and the .NET server.
+    netstandard2.1 + C# 9 is what Unity 6 can consume; do not raise either.
+    Unity consumes this folder as a local UPM package (package.json + Battle.Core.asmdef).
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Automatic.Battle</RootNamespace>
+    <CheckForOverflowUnderflow>true</CheckForOverflowUnderflow>
+  </PropertyGroup>
+  <ItemGroup>
+    <InternalsVisibleTo Include="Battle.Core.Tests" />
+  </ItemGroup>
+</Project>

@@ -1,0 +1,7 @@
+{
+  "name": "com.automatic.battle.core",
+  "version": "0.1.0",
+  "displayName": "Automatic Battle Core",
+  "description": "Deterministic fixed-point battle simulation shared by client and server.",
+  "unity": "6000.0"
+}
