@@ -1,5 +1,5 @@
 # Builds the Zheng quadruped rig on a Tripo mesh and binds it with automatic (bone heat) weights.
-# usage: blender -b --python rig_zheng.py -- <in.glb> <out.blend>
+# usage: blender -b --python rig_zheng.py -- <in.glb> <out.blend> [target triangles]
 # Joint positions are in the imported glb's space (Z up, head toward +X), read from
 # orthographic renders and mesh slices of toon_v1.glb (see art/zheng/model/README.md).
 import bpy, bmesh, sys
@@ -46,6 +46,8 @@ for t, pts in enumerate(TAILS, 1):
     for i in range(len(pts) - 1):
         BONES[f"tail{t}.{i + 1}"] = (pts[i], pts[i + 1], "hips" if i == 0 else f"tail{t}.{i}", True)
 
+
+TARGET_TRIS = 3000  # design/08 §2: 46 units on a full board; 5000 for close-ups is indistinguishable on the board
 
 WHISKER_VOXEL = 0.01  # glb scale; coarse enough that whiskers vanish from the remesh
 WHISKER_TIP = 0.02  # vertices this far outside the remesh seed the whisker selection
@@ -98,6 +100,24 @@ def remove_whiskers(mesh):
     bm.to_mesh(mesh.data)
     bm.free()
     print("WHISKERS seeds", len(seeds), "removed verts", len(doomed))
+
+
+def decimate(mesh, target):
+    """Welds the glb's UV-seam splits (UVs stay per corner), then collapse-decimates to ~target triangles."""
+    bm = bmesh.new()
+    bm.from_mesh(mesh.data)
+    bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
+    bmesh.ops.triangulate(bm, faces=bm.faces)
+    before = len(bm.faces)
+    bm.to_mesh(mesh.data)
+    bm.free()
+    mod = mesh.modifiers.new("decimate", 'DECIMATE')
+    mod.decimate_type = 'COLLAPSE'
+    mod.ratio = min(1.0, target / before)
+    mod.use_collapse_triangulate = True
+    bpy.context.view_layer.objects.active = mesh
+    bpy.ops.object.modifier_apply(modifier=mod.name)
+    print("DECIMATE tris", before, "->", len(mesh.data.polygons), "verts", len(mesh.data.vertices))
 
 
 def keep_largest_island(obj):
@@ -176,7 +196,7 @@ def paint_parts(mesh):
         attr.data[v.index].color_srgb = (pos, min(tail, 1), min(h, 1), 1)
 
 
-def build(src, out):
+def build(src, out, target=TARGET_TRIS):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=src)
     mesh = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
@@ -189,6 +209,7 @@ def build(src, out):
         bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     remove_whiskers(mesh)
+    decimate(mesh, target)
     mesh.scale = (BIND_SCALE,) * 3
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
     for o in list(bpy.context.scene.objects):
@@ -230,4 +251,4 @@ def build(src, out):
 
 if __name__ == "__main__":
     a = sys.argv[sys.argv.index("--") + 1:]
-    build(a[0], a[1])
+    build(a[0], a[1], int(a[2]) if len(a) > 2 else TARGET_TRIS)
