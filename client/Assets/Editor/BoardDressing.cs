@@ -203,9 +203,11 @@ namespace Automatic.Editor
             return mat;
         }
 
-        public static Mesh SaveMesh(string name, Mesh mesh)
+        public static Mesh SaveMesh(string name, Mesh mesh) => SaveMesh(Dir, name, mesh);
+
+        public static Mesh SaveMesh(string dir, string name, Mesh mesh)
         {
-            var path = Dir + name + "_mesh.asset"; // YooAsset addresses by file name, so not "<name>.asset" next to "<name>.mat"
+            var path = dir + name + "_mesh.asset"; // YooAsset addresses by file name, so not "<name>.asset" next to "<name>.mat"
             mesh.name = name;
             var old = AssetDatabase.LoadAssetAtPath<Mesh>(path);
             if (old == null)

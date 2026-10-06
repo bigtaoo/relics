@@ -39,6 +39,8 @@ namespace Automatic.Editor
 
         public static void BoardSlice() => Run(Automatic.Editor.BoardSlice.Build);
 
+        public static void FxSlice() => Run(Automatic.Editor.FxSlice.Build);
+
         private static void Run(Action action)
         {
             try

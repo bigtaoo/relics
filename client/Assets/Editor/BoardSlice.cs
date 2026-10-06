@@ -23,8 +23,8 @@ namespace Automatic.Editor
     /// </summary>
     public static class BoardSlice
     {
-        private const string ScenePath = "Assets/HotRes/Scenes/board_west.unity";
-        private const string ZhengDir = "Assets/HotRes/Art/Zheng/";
+        internal const string ScenePath = "Assets/HotRes/Scenes/board_west.unity";
+        internal const string ZhengDir = "Assets/HotRes/Art/Zheng/";
         private const float Pitch = 50, Fov = 30;
         private const float UnitLength = 0.85f, BenchScale = 0.8f;
         private const float PedestalHeight = 0.05f;
@@ -175,7 +175,7 @@ namespace Automatic.Editor
         }
 
         /// <summary>Pulls the camera back until the whole table, with units standing on it, is in view.</summary>
-        private static void Fit(Camera cam, float aspect)
+        internal static void Fit(Camera cam, float aspect)
         {
             cam.aspect = aspect;
             var w = BoardLayout.HalfWidth;
@@ -194,7 +194,7 @@ namespace Automatic.Editor
             }
         }
 
-        private static void Render(Camera cam, int w, int h, string file)
+        internal static void Render(Camera cam, int w, int h, string file)
         {
             var rt = new RenderTexture(w, h, 24) { antiAliasing = 4 };
             cam.targetTexture = rt;
