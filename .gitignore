@@ -21,3 +21,14 @@ client/*.slnx
 # Claude local state
 .claude/settings.local.json
 .claude/worktrees/
+
+# Hot update build products (client/, design/07)
+client/HybridCLRData/
+client/Bundles/
+client/yoo/
+client/Assets/HybridCLRGenerate/
+client/Assets/HybridCLRGenerate.meta
+client/Assets/HotRes/Dlls/
+client/Assets/HotRes/Dlls.meta
+client/Assets/StreamingAssets/
+client/Assets/StreamingAssets.meta

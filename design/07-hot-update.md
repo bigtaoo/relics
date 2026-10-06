@@ -85,6 +85,10 @@ Battle.Core 在热更层，所以**客户端与服务端的核心版本可能不
 
 美术流程验证（08）的产出也要走一次这条热更链路。
 
+**2026-10-06 Windows 验证通过（第 1–4 步）**：Unity 6000.3.25f1 + HybridCLR 8.15.0 + YooAsset 3.0.6，IL2CPP 打包。exe 启动后从本地 CDN 拉资源，热更层里 7 项 Prng / FP 黄金值全部 PASS，与 `dotnet test` 一致。之后只发布热更（不重打 exe），重启后下载 2 个文件（约 1 MB），新代码文字和新材质颜色都生效。安卓、iOS 真机待做；第 5 步等 Core 有战斗逻辑后再补。
+
+操作步骤见 `client/README.md`，全部步骤都能用 Unity CLI 无界面执行（`Assets/Editor/Batch.cs`）。本地用 `artifacts/cdn` 加 `python -m http.server` 充当 CDN；发布时先传包、最后传 `.version`，版本不比线上新就拒绝（09 §3 的护栏在本地先实现一遍）。
+
 ## 8. 三端差异（ADR-009）
 
 | 项 | iOS | Android | Windows |

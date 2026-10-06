@@ -1,0 +1,14 @@
+{
+  "name": "Automatic.Game",
+  "rootNamespace": "Automatic.Game",
+  "references": ["Automatic.Battle.Core", "YooAsset"],
+  "includePlatforms": [],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

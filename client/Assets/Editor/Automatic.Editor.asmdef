@@ -1,0 +1,21 @@
+{
+  "name": "Automatic.Editor",
+  "rootNamespace": "Automatic.Editor",
+  "references": [
+    "Automatic.Boot",
+    "YooAsset",
+    "YooAsset.Editor",
+    "HybridCLR.Editor",
+    "Unity.RenderPipelines.Core.Runtime",
+    "Unity.RenderPipelines.Universal.Runtime"
+  ],
+  "includePlatforms": ["Editor"],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": false,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
+}

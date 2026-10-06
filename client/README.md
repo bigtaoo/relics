@@ -1,16 +1,56 @@
 # client — Unity project
 
-Not created yet. To create it:
+Unity 6.3 LTS (6000.3.x), URP, IL2CPP on all platforms. Hot update: HybridCLR (code) + YooAsset
+(assets), see `design/07-hot-update.md`.
 
-1. Unity Hub → New project → Unity 6 (6000.x), template **Universal 3D (URP)**, location `D:\automatic\client`.
-2. Add the shared battle core to `client/Packages/manifest.json`:
+## Layout
 
-   ```json
-   "com.automatic.battle.core": "file:../../src/Battle.Core"
+| Path | Assembly | Hot update |
+|---|---|---|
+| `Assets/Boot/` | `Automatic.Boot` | No (AOT shell). Must never reference hot assemblies |
+| `Packages/` → `src/Battle.Core` | `Automatic.Battle.Core` | Yes |
+| `Assets/HotUpdate/Game/` | `Automatic.Game` | Yes. Entry: `Automatic.Game.GameEntry.Start()` |
+| `Assets/HotRes/` | — | Yes. Everything here is collected into the YooAsset package `DefaultPackage` |
+| `Assets/Editor/` | `Automatic.Editor` | Editor only: setup and build menus |
+
+## First-time setup
+
+Prerequisites: Unity Hub, Unity 6000.3 LTS with *Windows Build Support (IL2CPP)* (plus Android / iOS
+modules later), Visual Studio with the *Desktop development with C++* workload (IL2CPP needs MSVC), git.
+
+1. Unity Hub → Add → `D:\automatic\client`, open with 6000.3.x.
+2. `HybridCLR/Installer...` → Install (clones il2cpp_plus; needs git and network).
+3. `Automatic/1. Setup Project` (idempotent): player settings, HybridCLR settings, URP, `HotCube`
+   prefab and material, YooAsset collector, boot scene.
+
+## Hot update minimal validation (design/07 §7)
+
+1. Editor: open `Assets/Boot/Boot.unity`, Play. Expect a spinning bronze cube and all `PASS` lines.
+2. `Automatic/3. Build Player` (Windows). Output `artifacts/player/PC/Relics.exe`, resources
+   published to `artifacts/cdn/PC/`.
+3. Serve the CDN from the repo root:
+
+   ```bash
+   python -m http.server 8000 --directory artifacts/cdn
    ```
 
-3. Game code lives in its own asmdef that references `Automatic.Battle.Core`. Rendering code must
-   never be referenced from the core (the core asmdef has `noEngineReferences: true`).
+4. Run `Relics.exe`: same cube, all `PASS` (now inside the HybridCLR interpreter).
+5. Change `GameEntry.BuildLabel` and the color of `Assets/HotRes/Bronze.mat`, then
+   `Automatic/2. Build Hot Update`. Restart `Relics.exe` without rebuilding it: new label and color.
 
-See `design/01-sync-architecture.md` for the client's role (presentation + local re-simulation)
-and `design/04-art-direction.md` for rendering direction.
+## Headless (Unity CLI)
+
+Every menu step has a batch entry in `Assets/Editor/Batch.cs`, usable locally and in CI:
+
+```bash
+unity run client --no-tail -l setup.log -- -executeMethod Automatic.Editor.Batch.InstallHybridClr
+unity run client --no-tail -l setup.log -- -executeMethod Automatic.Editor.Batch.Setup
+unity run client --no-tail -l player.log -- -buildTarget Win64 -executeMethod Automatic.Editor.Batch.BuildPlayer
+unity run client --no-tail -l hot.log -- -buildTarget Win64 -executeMethod Automatic.Editor.Batch.BuildHotUpdate
+```
+
+`unity run` adds `-batchmode -quit` itself; do not pass them. The player writes `[Boot]` and `[Hot]`
+lines to its log (`Relics.exe -logFile run.log`), so a run can be checked without reading the screen.
+
+Build products (`HybridCLRData/`, `Bundles/`, `Assets/HotRes/Dlls/`, `Assets/StreamingAssets/`,
+`artifacts/`) are not committed.
