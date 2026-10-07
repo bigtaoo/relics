@@ -100,9 +100,16 @@ Launch switches go through `LaunchArgs` (hot code): the command line on desktop,
 intent extra on Android (read with raw JNI in `Jni.cs`). For phones, `-fps N` caps the frame rate
 (the bench otherwise asks for 1000; Android's default would be 30), `-duration S` measures for S
 seconds, and a `[Bench] t=` line every 30 s logs that window with the battery temperature and thermal
-status. `tools/bench/android.sh [--install] suite|soak` installs `artifacts/player/Android/Relics.apk`,
+status. `tools/bench/android.sh [--install] suite|soak|sim` installs `artifacts/player/Android/Relics.apk`,
 sets up `adb reverse tcp:8000 tcp:8000` for the local CDN, runs the cases and keeps the `[Bench]`
 lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`ProjectSetup`).
+
+Battle logic test (design/10): `-simbench [-seeds N]` runs the `CrowdBattle` stress prototype of
+Battle.Core (8v8, summon build, 300 units) inside the HybridCLR interpreter and logs `[SimBench]`
+lines with the time per battle, the worst tick and the end hash against the golden values, then
+quits. Works with `-batchmode -nographics`. The same scenarios on .NET: `dotnet run -c Release
+--project tools/SimBench`. `BuildPlayer -release` (editor command line) builds a non-development
+player into `artifacts/player/PC-release` that may still use the http CDN.
 
 `BuildHotUpdate` refuses to publish when hot code calls engine or BCL API that the last player
 build of that target stripped (`HotUpdateBuild.CheckShellApi`, design/07 §4): it would throw

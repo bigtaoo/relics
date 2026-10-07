@@ -3,10 +3,11 @@
 # Each case starts the app with BoardBench switches (LaunchArgs reads them from the "unity" intent
 # extra), waits for the bench to finish and keeps its "[Bench]" lines in artifacts/bench/android/.
 #
-# usage: tools/bench/android.sh [--install] suite|soak|<name> "<switches>"
+# usage: tools/bench/android.sh [--install] suite|soak|sim|<name> "<switches>"
 #   --install   install artifacts/player/Android/Relics.apk first
 #   suite       base board, 300 units skinned / VAT, VAT + 30/60/120 effects (~10 s each)
 #   soak        300 units VAT + 30 effects capped at 30 fps for 10 min, logging heat every 30 s
+#   sim         battle logic stress test in the interpreter (SimBench: 8v8, summons, 300 units; a few minutes)
 #
 # Needs: USB debugging on, the local CDN on port 8000 (python -m http.server 8000 in artifacts/cdn).
 set -euo pipefail
@@ -33,12 +34,12 @@ run() { # name, switches, timeout seconds
   "$ADB" logcat -c
   "$ADB" shell am start -S -n "$PKG/$ACTIVITY" -e unity "'$args'" >/dev/null
   local waited=0
-  until "$ADB" logcat -d -s Unity | grep -q "\[Bench\] memory MB"; do
+  until "$ADB" logcat -d -s Unity | grep -q "\[Bench\] memory MB\|\[SimBench\] done"; do
     sleep 2
     waited=$((waited + 2))
     if [ "$waited" -ge "$limit" ]; then echo "== $name: no result after ${limit}s"; break; fi
   done
-  "$ADB" logcat -d -s Unity | grep -a "\[Bench\]\|Exception" | sed 's/^.*\[Bench\] //' > "$OUT/$name.log" || true
+  "$ADB" logcat -d -s Unity | grep -a "\[Bench\]\|\[SimBench\]\|Exception" | sed 's/^.*\[\(Sim\)\{0,1\}Bench\] //' > "$OUT/$name.log" || true
   "$ADB" shell am force-stop "$PKG"
   echo "== $name ($args)"
   grep -v "^scene board" "$OUT/$name.log" | head -20
@@ -55,6 +56,9 @@ case "${1:-suite}" in
     ;;
   soak)
     run soak "-bench -crowd 254 -vat -fx 30 -fps 30 -duration 600" 720
+    ;;
+  sim)
+    run sim "-simbench -seeds 3" 900
     ;;
   *)
     run "$1" "$2" "${3:-120}"

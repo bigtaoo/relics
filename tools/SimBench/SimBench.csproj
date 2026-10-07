@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Battle logic stress test on .NET (the server runtime): CPU per battle and battles per core (design/08 §2). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>Automatic.SimBench</RootNamespace>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <ServerGarbageCollection>true</ServerGarbageCollection>
+  </PropertyGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\Battle.Core\Battle.Core.csproj" />
+  </ItemGroup>
+</Project>
