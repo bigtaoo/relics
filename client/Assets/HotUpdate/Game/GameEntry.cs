@@ -1,4 +1,3 @@
-using System.Linq;
 using UnityEngine;
 using YooAsset;
 
@@ -24,7 +23,7 @@ namespace Automatic.Game
                 BoardBench.Run(package);
                 return;
             }
-            if (!System.Environment.GetCommandLineArgs().Contains("-hotcheck"))
+            if (!LaunchArgs.Has("-hotcheck"))
             {
                 ShopDemo.Run(package);
                 return;

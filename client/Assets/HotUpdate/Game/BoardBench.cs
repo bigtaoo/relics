@@ -14,13 +14,17 @@ namespace Automatic.Game
     /// -nosrpbatch turns the SRP Batcher off, to check that it is actually batching; -nooutline
     /// turns the toon outline pass off; -crowd N adds summons and -fx K effects (CrowdBench);
     /// -shot dir saves one screenshot after the warmup (raw RGB24 like ShopDemo -autoplay).
+    /// For the heat soak on phones: -duration S measures for S seconds instead of 10, -fps N caps
+    /// the frame rate (uncapped by default; phones still stop at the display refresh), and every
+    /// 30 s a "[Bench] t=" line logs that window's frame times with the battery temperature and
+    /// thermal status (Android).
     /// </summary>
     public sealed class BoardBench : MonoBehaviour
     {
         private const string Scene = "board_west";
-        private const float Warmup = 3, Duration = 10;
+        private const float Warmup = 3, Window = 30;
 
-        public static bool Requested() => System.Environment.GetCommandLineArgs().Contains("-bench");
+        public static bool Requested() => LaunchArgs.Has("-bench");
 
         private static readonly string[] RenderCounters =
         {
@@ -43,10 +47,12 @@ namespace Automatic.Game
 
         private IEnumerator Measure(ResourcePackage package)
         {
-            if (System.Environment.GetCommandLineArgs().Contains("-nosrpbatch"))
+            if (LaunchArgs.Has("-nosrpbatch"))
                 UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching = false;
             QualitySettings.vSyncCount = 0;
-            Application.targetFrameRate = -1;
+            // -1 is "platform default", which is 30 on phones.
+            Application.targetFrameRate = int.TryParse(LaunchArgs.After("-fps"), out var cap) ? cap : 1000;
+            var duration = float.TryParse(LaunchArgs.After("-duration"), out var d) ? d : 10;
             var load = package.LoadSceneAsync(Scene);
             yield return load;
             Debug.Log($"[Bench] scene {Scene} {load.Status}, screen {Screen.width}x{Screen.height}, {SystemInfo.graphicsDeviceName}, {SystemInfo.processorType}, " +
@@ -55,13 +61,13 @@ namespace Automatic.Game
             var crowd = CrowdBench.Requested() > 0 ? CrowdBench.Create(package, CrowdBench.Requested()) : null;
             if (crowd != null) Debug.Log("[Bench] crowd: " + crowd.Describe());
 
-            if (System.Environment.GetCommandLineArgs().Contains("-nooutline"))
+            if (LaunchArgs.Has("-nooutline"))
                 foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
                 foreach (var m in r.sharedMaterials)
                     if (m != null && m.shader.name == "Relics/Toon") m.SetShaderPassEnabled("Outline", false);
 
             yield return new WaitForSecondsRealtime(Warmup);
-            var shot = ShopDemo.ArgAfter("-shot");
+            var shot = LaunchArgs.After("-shot");
             if (shot != null)
             {
                 yield return new WaitForEndOfFrame();
@@ -80,11 +86,23 @@ namespace Automatic.Game
             var main = new List<double>();
             var renderThread = new List<double>();
             var timings = new FrameTiming[1];
-            var end = Time.realtimeSinceStartup + Duration;
+            var start = Time.realtimeSinceStartup;
+            var end = start + duration;
+            var windowFrames = 0;
+            var nextWindow = start + Window;
+            Debug.Log("[Bench] t=0s " + Heat());
             while (Time.realtimeSinceStartup < end)
             {
                 yield return null;
                 frames.Add(Time.unscaledDeltaTime * 1000);
+                if (Time.realtimeSinceStartup >= nextWindow)
+                {
+                    var w = frames.Skip(windowFrames).ToList();
+                    Debug.Log($"[Bench] t={nextWindow - start:F0}s avg {w.Average():F2} ms ({1000 / w.Average():F0} fps), " +
+                              $"p99 {w.OrderBy(x => x).ElementAt((int)(w.Count * 0.99f)):F2} ms, gpu {Tail(gpu, w.Count)}, main {Tail(main, w.Count)}, {Heat()}");
+                    windowFrames = frames.Count;
+                    nextWindow += Window;
+                }
                 // A single frame's counters jump (some frames report a third of the triangles), so
                 // keep every frame and report the median.
                 for (var i = 0; i < render.Length; i++) renderSamples[i].Add(render[i].LastValue);
@@ -112,6 +130,22 @@ namespace Automatic.Game
                 $"{n} {(memory[i].Valid ? (memory[i].LastValue / 1048576.0).ToString("F1") : "n/a")}")));
             foreach (var r in render.Concat(memory)) r.Dispose();
             Application.Quit();
+        }
+
+        private static string Tail(List<double> v, int n) => v.Count > 0 ? $"{v.Skip(Mathf.Max(0, v.Count - n)).Average():F2} ms" : "n/a";
+
+        private static string Heat()
+        {
+            if (Application.platform != RuntimePlatform.Android) return "heat n/a";
+            try
+            {
+                var (status, headroom) = Jni.Thermal();
+                return $"battery {Jni.BatteryCelsius():F1} C, thermal status {status}, headroom {headroom:F2}";
+            }
+            catch (System.Exception e)
+            {
+                return "heat error " + e.Message;
+            }
         }
     }
 }

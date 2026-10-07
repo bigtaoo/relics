@@ -37,7 +37,7 @@ namespace Automatic.Game
             public float Life, Until;
         }
 
-        public static int Requested() => int.TryParse(ShopDemo.ArgAfter("-crowd"), out var n) ? n : 0;
+        public static int Requested() => int.TryParse(LaunchArgs.After("-crowd"), out var n) ? n : 0;
 
         private readonly List<Summon> summons = new();
         private readonly List<Effect> effects = new();
@@ -69,11 +69,11 @@ namespace Automatic.Game
 
         public void ResetStats() => particleSamples.Clear();
 
-        private static bool Optimized => System.Environment.GetCommandLineArgs().Contains("-optimize");
+        private static bool Optimized => LaunchArgs.Has("-optimize");
 
         private void Spawn(ResourcePackage package, int count)
         {
-            vat = System.Environment.GetCommandLineArgs().Contains("-vat");
+            vat = LaunchArgs.Has("-vat");
             // UnityEngine.Random, not System.Random: the shell strips System.Random.NextDouble (HotUpdateBuild.CheckShellApi).
             Random.InitState(1);
             var units = GameObject.Find("Units").transform;
@@ -131,7 +131,7 @@ namespace Automatic.Game
             matrices = new Matrix4x4[summons.Count];
             clipData = new Vector4[summons.Count];
 
-            if (!int.TryParse(ShopDemo.ArgAfter("-fx"), out var fx)) return;
+            if (!int.TryParse(LaunchArgs.After("-fx"), out var fx)) return;
             var prefabs = Effects.Distinct().ToDictionary(n => n, n => package.LoadAssetSync<GameObject>(n).AssetObject as GameObject);
             for (var i = 0; i < fx; i++)
             {

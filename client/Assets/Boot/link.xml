@@ -16,4 +16,6 @@
   <assembly fullname="UnityEngine.UIModule" preserve="all" />
   <assembly fullname="UnityEngine.TextRenderingModule" preserve="all" />
   <assembly fullname="UnityEngine.InputLegacyModule" preserve="all" />
+  <!-- Raw JNI for launch arguments and device temperature on Android (hot Jni.cs). -->
+  <assembly fullname="UnityEngine.AndroidJNIModule" preserve="all" />
 </linker>

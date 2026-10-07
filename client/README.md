@@ -96,6 +96,14 @@ materials (`Assets/HotRes/Art/Crowd/`) come from `Batch.CrowdBake`; rerun it aft
 model or its clips change. Instanced draws need materials with instancing on in the hot bundle,
 or the shader's instancing variant is not in it and nothing is drawn.
 
+Launch switches go through `LaunchArgs` (hot code): the command line on desktop, the `unity`
+intent extra on Android (read with raw JNI in `Jni.cs`). For phones, `-fps N` caps the frame rate
+(the bench otherwise asks for 1000; Android's default would be 30), `-duration S` measures for S
+seconds, and a `[Bench] t=` line every 30 s logs that window with the battery temperature and thermal
+status. `tools/bench/android.sh [--install] suite|soak` installs `artifacts/player/Android/Relics.apk`,
+sets up `adb reverse tcp:8000 tcp:8000` for the local CDN, runs the cases and keeps the `[Bench]`
+lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`ProjectSetup`).
+
 `BuildHotUpdate` refuses to publish when hot code calls engine or BCL API that the last player
 build of that target stripped (`HotUpdateBuild.CheckShellApi`, design/07 §4): it would throw
 MissingMethodException in that shell. Avoid the API, or preserve it in `Assets/Boot/link.xml`

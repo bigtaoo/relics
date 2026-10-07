@@ -87,7 +87,7 @@ namespace Automatic.Game
         /// -autoplay dir: clicks the card by itself, saves screenshots along the timeline as raw
         /// RGB24 (bottom-up, size in the name; the player has no image encoder module), quits.
         /// </summary>
-        private static readonly string autoplay = ArgAfter("-autoplay");
+        private static readonly string autoplay = LaunchArgs.After("-autoplay");
 
         private IEnumerator Autoplay()
         {
@@ -134,13 +134,6 @@ namespace Automatic.Game
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(autoplay, $"demo_{name}_{Screen.width}x{Screen.height}.rgb"), tex.GetRawTextureData());
             Destroy(tex);
-        }
-
-        internal static string ArgAfter(string name)
-        {
-            var args = Environment.GetCommandLineArgs();
-            var i = Array.IndexOf(args, name);
-            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         }
 
         private void Setup()

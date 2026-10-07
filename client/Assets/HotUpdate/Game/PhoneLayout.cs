@@ -56,8 +56,8 @@ namespace Automatic.Game
         /// </summary>
         public static PhoneLayout Detect()
         {
-            var variant = char.ToUpperInvariant((ShopDemo.ArgAfter("-layout") ?? "A")[0]);
-            var device = ShopDemo.ArgAfter("-device");
+            var variant = char.ToUpperInvariant((LaunchArgs.After("-layout") ?? "A")[0]);
+            var device = LaunchArgs.After("-device");
             if (device != null)
             {
                 foreach (var d in Devices)

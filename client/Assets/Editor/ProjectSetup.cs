@@ -46,6 +46,8 @@ namespace Automatic.Editor
                 PlayerSettings.SetScriptingBackend(target, ScriptingImplementation.IL2CPP);
                 PlayerSettings.SetApiCompatibilityLevel(target, ApiCompatibilityLevel.NET_Standard);
             }
+            // GPU skinning: 300 skinned units 4.9 -> 4.0 ms on the PC (design/08 §2); the A16 still to compare.
+            PlayerSettings.meshDeformation = MeshDeformation.GPUBatched;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.iOS.targetOSVersionString = "15.0";
             // Local CDN is plain http during validation; tighten when a real CDN exists.
