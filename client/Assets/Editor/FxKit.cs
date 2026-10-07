@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -48,6 +49,36 @@ namespace Automatic.Editor
             set(main, ps, r);
         }
 
+        /// <summary>A layer drawn from the effect atlas (FxAssets): its tile, intensity and opacity.</summary>
+        internal static void Layer(Transform root, string name, FxLook look, float y,
+            Action<ParticleSystem.MainModule, ParticleSystem, ParticleSystemRenderer> set) =>
+            Layer(root, name, FxAssets.Atlas, y, (main, ps, r) =>
+            {
+                var sheet = ps.textureSheetAnimation;
+                sheet.enabled = true;
+                sheet.numTilesX = look.TilesX;
+                sheet.numTilesY = look.TilesY;
+                // Frame over time is normalized over the whole sheet; constant over each particle's life.
+                float n = look.TilesX * look.TilesY;
+                sheet.frameOverTime = look.Frames == 1
+                    ? new ParticleSystem.MinMaxCurve((look.Frame + 0.5f) / n)
+                    : new ParticleSystem.MinMaxCurve(look.Frame / n, (look.Frame + look.Frames - 0.01f) / n);
+                sheet.startFrame = 0;
+                var data = ps.customData;
+                data.enabled = true;
+                data.SetMode(ParticleSystemCustomData.Custom1, ParticleSystemCustomDataMode.Vector);
+                data.SetVectorComponentCount(ParticleSystemCustomData.Custom1, 2);
+                data.SetVector(ParticleSystemCustomData.Custom1, 0, look.Intensity);
+                data.SetVector(ParticleSystemCustomData.Custom1, 1, look.Opacity);
+                r.SetActiveVertexStreams(new List<ParticleSystemVertexStream>
+                {
+                    ParticleSystemVertexStream.Position, ParticleSystemVertexStream.Color,
+                    ParticleSystemVertexStream.UV, ParticleSystemVertexStream.Custom1XY, // TEXCOORD0.xy, .zw
+                });
+                if (look.Under) r.sortingOrder = -1;
+                set(main, ps, r);
+            });
+
         internal static void Burst(ParticleSystem ps, int count)
         {
             var e = ps.emission;
@@ -92,16 +123,6 @@ namespace Automatic.Editor
             var rot = ps.rotationOverLifetime;
             rot.enabled = true;
             rot.z = degreesPerSecond * Mathf.Deg2Rad;
-        }
-
-        /// <summary>Random frame of the 2x2 flame sheet, held for the particle's life.</summary>
-        internal static void Flipbook(ParticleSystem ps)
-        {
-            var sheet = ps.textureSheetAnimation;
-            sheet.enabled = true;
-            sheet.numTilesX = sheet.numTilesY = 2;
-            sheet.frameOverTime = 0;
-            sheet.startFrame = new ParticleSystem.MinMaxCurve(0, 3.99f);
         }
 
         internal static void Size(ParticleSystem ps, params (float t, float v)[] keys)

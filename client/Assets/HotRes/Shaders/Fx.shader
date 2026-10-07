@@ -1,15 +1,14 @@
-// Particle effects (design/08 §1): unlit, texture red channel as mask, colour from the
-// material (HDR, feeds bloom) times the particle vertex colour. Premultiplied output with
-// _Opacity blending between additive (0) and alpha-blended (1): pure additive washes out to
-// white on the light parchment board, so fire and gold keep some opacity to hold their colour.
-// One blend state for every effect material; no lighting, no depth write: cheap enough for mobile.
+// Particle effects (design/08 §1): unlit, red channel of the shared mask atlas as mask, colour
+// from the particle vertex colour times an intensity (HDR, feeds bloom). Premultiplied output
+// with an opacity blending between additive (0) and alpha-blended (1): pure additive washes out
+// to white on the light parchment board, so fire and gold keep some opacity to hold their colour.
+// Intensity and opacity come per particle (custom data, TEXCOORD0.zw), so every effect layer
+// shares one material and batches (art/fx/README.md §5). No lighting, no depth write.
 Shader "Relics/Fx"
 {
     Properties
     {
         _BaseMap ("Mask (R)", 2D) = "white" {}
-        [HDR] _Color ("Color", Color) = (1, 1, 1, 1)
-        _Opacity ("Opacity (0 additive, 1 alpha blend)", Range(0, 1)) = 0
     }
     SubShader
     {
@@ -27,28 +26,27 @@ Shader "Relics/Fx"
 
             CBUFFER_START(UnityPerMaterial)
                 float4 _BaseMap_ST;
-                half4 _Color;
-                half _Opacity;
             CBUFFER_END
             TEXTURE2D(_BaseMap);
             SAMPLER(sampler_BaseMap);
 
-            struct Attributes { float4 positionOS : POSITION; float2 uv : TEXCOORD0; half4 color : COLOR; };
-            struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; half4 color : COLOR; };
+            // uv: atlas uv in xy, intensity and opacity in zw.
+            struct Attributes { float4 positionOS : POSITION; float4 uv : TEXCOORD0; half4 color : COLOR; };
+            struct Varyings { float4 positionCS : SV_POSITION; float4 uv : TEXCOORD0; half4 color : COLOR; };
 
             Varyings Vert(Attributes i)
             {
                 Varyings o;
                 o.positionCS = TransformObjectToHClip(i.positionOS.xyz);
-                o.uv = TRANSFORM_TEX(i.uv, _BaseMap);
+                o.uv = float4(TRANSFORM_TEX(i.uv.xy, _BaseMap), i.uv.zw);
                 o.color = i.color;
                 return o;
             }
 
             half4 Frag(Varyings i) : SV_Target
             {
-                half a = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv).r * i.color.a * _Color.a;
-                return half4(_Color.rgb * i.color.rgb * a, a * _Opacity);
+                half a = SAMPLE_TEXTURE2D(_BaseMap, sampler_BaseMap, i.uv.xy).r * i.color.a;
+                return half4(i.uv.z * i.color.rgb * a, a * i.uv.w);
             }
             ENDHLSL
         }

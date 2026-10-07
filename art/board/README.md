@@ -172,7 +172,7 @@
   - 棋子本身（数量少、要混合和挂点）继续用蒙皮。
 - **骨骼节点优化**（`AnimatorUtility.OptimizeTransformHierarchy`）在 PC 上没有收益，瓶颈不在骨骼节点。手机上要重测。
 - **CPU 蒙皮还是 GPU 蒙皮**：上面几行都是在 CPU 蒙皮的壳上测的（当时项目设置是 `meshDeformation: 0`）。2026-10-07 在 PC 上补测了 GPU 蒙皮（batched），见下一节。
-- **特效**：数据见 `art/fx/README.md` §5。
+- **特效**：数据见 `art/fx/README.md` §5。表里最后一行 SetPass 81 是特效材质交错造成的，已改成图集加一个材质，现在特效多时 SetPass 在 20 多（同节「图集」）。
 
 **复现方法**：先开本地 CDN，然后运行：
 

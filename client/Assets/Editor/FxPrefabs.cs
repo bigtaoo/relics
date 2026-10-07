@@ -97,7 +97,6 @@ namespace Automatic.Editor
                 main.startLifetime = new ParticleSystem.MinMaxCurve(0.22f, 0.32f);
                 main.startSize = new ParticleSystem.MinMaxCurve(0.22f, 0.32f);
                 main.startRotation = new ParticleSystem.MinMaxCurve(0, Mathf.PI * 2);
-                Flipbook(ps);
                 Size(ps, (0, 1), (1, 0.2f));
                 Colour(ps, Fire, Ember, (0, 1), (0.6f, 0.8f), (1, 0));
             });
@@ -136,7 +135,6 @@ namespace Automatic.Editor
                 main.gravityModifier = -0.3f;
                 Sphere(ps, 0.1f);
                 Drag(ps, 4);
-                Flipbook(ps);
                 Size(ps, (0, 0.6f), (1, 1.3f));
                 Colour(ps, Hot, Ember, (0, 1), (0.5f, 0.9f), (1, 0));
             });
@@ -172,7 +170,6 @@ namespace Automatic.Editor
                 main.startRotation = new ParticleSystem.MinMaxCurve(0, Mathf.PI * 2);
                 main.gravityModifier = -0.15f;
                 Sphere(ps, 0.15f);
-                Flipbook(ps);
                 Size(ps, (0, 0.6f), (1, 1.4f));
                 var smoke = new Color(0.25f, 0.18f, 0.14f);
                 Colour(ps, smoke, smoke, (0, 0), (0.2f, 0.55f), (1, 0));

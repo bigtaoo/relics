@@ -148,7 +148,6 @@ namespace Automatic.Editor
                 var shape = ps.shape;
                 shape.rotation = new Vector3(90, 0, 0); // flat on the table, pushing outwards
                 Drag(ps, 3);
-                Flipbook(ps);
                 Size(ps, (0, 0.5f), (1, 1.4f));
                 Colour(ps, Earth, Earth, (0, 0), (0.15f, 0.6f), (1, 0));
             });
@@ -199,7 +198,6 @@ namespace Automatic.Editor
                 var shape = ps.shape;
                 shape.rotation = new Vector3(90, 0, 0);
                 Drag(ps, 4);
-                Flipbook(ps);
                 Size(ps, (0, 0.6f), (1, 1.3f));
                 Colour(ps, Earth, Earth, (0, 0), (0.15f, 0.5f), (1, 0));
             });
