@@ -102,16 +102,21 @@ namespace Automatic.Editor
             package.EnableAddressable = true;
             var group = package.Groups.Find(g => g.GroupName == "Default")
                         ?? BundleCollectorSettingData.CreateGroup(package, "Default");
-            if (!group.Collectors.Exists(c => c.CollectPath == HotResRoot))
+            var collector = group.Collectors.Find(c => c.CollectPath == HotResRoot);
+            if (collector == null)
             {
                 BundleCollectorSettingData.CreateCollector(group, new BundleCollector
                 {
                     CollectPath = HotResRoot,
                     CollectorGUID = AssetDatabase.AssetPathToGUID(HotResRoot),
                     AddressRuleName = nameof(AddressByFileName),
-                    PackRuleName = nameof(PackDirectory),
+                    PackRuleName = nameof(PackDirectoryMaterialsApart),
                     FilterRuleName = nameof(CollectAll),
                 });
+            }
+            else
+            {
+                collector.PackRuleName = nameof(PackDirectoryMaterialsApart);
             }
             BundleCollectorSettingData.SaveFile();
         }
