@@ -1,6 +1,7 @@
 using System;
 using System.Collections;
 using System.Collections.Generic;
+using UnityEngine;
 using YooAsset;
 
 namespace Automatic.Boot
@@ -8,9 +9,18 @@ namespace Automatic.Boot
     /// <summary>
     /// Startup resource update (design/07 §3): init package → request version → load manifest →
     /// download the difference. Hot DLLs travel in the same package, so code and art share one version.
+    /// <see cref="Initialize"/> runs once; <see cref="Update"/> can be rerun after a network failure,
+    /// files that finished downloading stay in the cache.
     /// </summary>
     public sealed class ResourceUpdater
     {
+        /// <summary>A download with no new bytes for this long is aborted and retried (seconds).</summary>
+        private const int WatchdogSeconds = 15;
+        /// <summary>Files at least this large resume an interrupted download (needs Range support on the CDN).</summary>
+        private const long ResumeMinimumBytes = 1 << 20;
+        /// <summary>Timeout for the small version and manifest requests (seconds).</summary>
+        private const int RequestTimeout = 15;
+
         public ResourcePackage Package { get; private set; }
         public string Error { get; private set; }
         public string Version { get; private set; }
@@ -25,7 +35,7 @@ namespace Automatic.Boot
             _report = report;
         }
 
-        public IEnumerator Run()
+        public IEnumerator Initialize()
         {
             YooAssets.Initialize();
             Package = YooAssets.CreatePackage(BootConfig.PackageName);
@@ -33,16 +43,21 @@ namespace Automatic.Boot
             _report($"Initializing ({_mode})");
             var init = Package.InitializePackageAsync(CreateOptions());
             yield return init;
-            if (Fail(init)) yield break;
+            Fail(init);
+        }
 
+        public IEnumerator Update()
+        {
+            Error = null;
+            Progress = 0f;
             _report("Requesting version");
-            var version = Package.RequestPackageVersionAsync();
+            var version = Package.RequestPackageVersionAsync(new RequestPackageVersionOptions(true, RequestTimeout));
             yield return version;
             if (Fail(version)) yield break;
             Version = version.PackageVersion;
 
             _report($"Loading manifest {Version}");
-            var manifest = Package.LoadPackageManifestAsync(new LoadPackageManifestOptions(Version, 60));
+            var manifest = Package.LoadPackageManifestAsync(new LoadPackageManifestOptions(Version, RequestTimeout));
             yield return manifest;
             if (Fail(manifest)) yield break;
 
@@ -92,7 +107,16 @@ namespace Automatic.Boot
                     var options = new HostPlayModeOptions();
                     options.BuiltinFileSystemParameters = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters();
                     options.BuiltinFileSystemParameters.AddParameter(EFileSystemParameter.CopyBuiltinPackageManifest, true);
-                    options.CacheFileSystemParameters = FileSystemParameters.CreateDefaultSandboxFileSystemParameters(new RemoteService(cdn));
+                    // YooAsset's default cache on Windows sits next to the exe (Relics_Data/yoo), which is
+                    // read-only under Program Files. The per-user data folder works on every platform.
+                    var cacheRoot = $"{Application.persistentDataPath}/yoo/{BootConfig.PackageName}";
+                    var cache = FileSystemParameters.CreateDefaultSandboxFileSystemParameters(new RemoteService(cdn), cacheRoot);
+                    // Defaults hang forever on a CDN that stops sending, restart big files from zero and
+                    // only check that cached files exist, so a damaged file is never replaced (design/07 §3).
+                    cache.AddParameter(EFileSystemParameter.DownloadWatchdogTimeout, WatchdogSeconds);
+                    cache.AddParameter(EFileSystemParameter.DownloadResumeMinimumSize, ResumeMinimumBytes);
+                    cache.AddParameter(EFileSystemParameter.FileVerifyLevel, EFileVerifyLevel.High);
+                    options.CacheFileSystemParameters = cache;
                     return options;
                 }
             }
