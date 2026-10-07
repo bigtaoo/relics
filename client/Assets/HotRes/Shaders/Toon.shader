@@ -117,8 +117,10 @@ Shader "Relics/Toon"
 
         Pass
         {
+            // Drawn by the "Toon Outline" renderer feature after all opaques, not in the forward
+            // draw, so the forward and outline draws each batch (ProjectSetup.EnsureOutlinePass).
             Name "Outline"
-            Tags { "LightMode" = "SRPDefaultUnlit" }
+            Tags { "LightMode" = "Outline" }
             Cull Front
             HLSLPROGRAM
             #pragma vertex Vert
@@ -138,7 +140,54 @@ Shader "Relics/Toon"
             ENDHLSL
         }
 
-        UsePass "Universal Render Pipeline/Lit/ShadowCaster"
-        UsePass "Universal Render Pipeline/Lit/DepthOnly"
+        // Own shadow and depth passes instead of UsePass from URP Lit: a borrowed pass brings Lit's
+        // UnityPerMaterial layout, which makes the whole shader SRP Batcher incompatible (design/08 §2).
+        Pass
+        {
+            Name "ShadowCaster"
+            Tags { "LightMode" = "ShadowCaster" }
+            ZWrite On
+            ZTest LEqual
+            ColorMask 0
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+
+            // Set by URP's shadow caster pass for the main (directional) light.
+            float3 _LightDirection;
+
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+
+            float4 Vert(Attributes i) : SV_POSITION
+            {
+                float3 positionWS = TransformObjectToWorld(i.positionOS.xyz);
+                float3 normalWS = TransformObjectToWorldNormal(i.normalOS);
+                float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
+            #if UNITY_REVERSED_Z
+                positionCS.z = min(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #else
+                positionCS.z = max(positionCS.z, UNITY_NEAR_CLIP_VALUE);
+            #endif
+                return positionCS;
+            }
+
+            half4 Frag() : SV_Target { return 0; }
+            ENDHLSL
+        }
+
+        Pass
+        {
+            Name "DepthOnly"
+            Tags { "LightMode" = "DepthOnly" }
+            ZWrite On
+            ColorMask R
+            HLSLPROGRAM
+            #pragma vertex Vert
+            #pragma fragment Frag
+
+            float4 Vert(float4 positionOS : POSITION) : SV_POSITION { return TransformObjectToHClip(positionOS.xyz); }
+            half4 Frag() : SV_Target { return 0; }
+            ENDHLSL
+        }
     }
 }

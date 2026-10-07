@@ -72,10 +72,36 @@ unity run client --no-tail -l hot.log -- -buildTarget Win64 -executeMethod Autom
 
 Board frame-rate test (design/08 §2): with the CDN running, `Relics.exe -bench -screen-width 1920
 -screen-height 1080 -screen-fullscreen 0 -logFile bench.log` loads `board_west` from the resource
-package, runs uncapped for 10 s and logs `[Bench]` lines, then quits.
+package, runs uncapped for 10 s and logs `[Bench]` lines (frame times, per-frame render counters as
+medians, memory), then quits. `-nosrpbatch` turns the SRP Batcher off and `-nooutline` the toon
+outline, to see what each costs.
+
+The toon outline is drawn by the `Toon Outline` RenderObjects feature on `Assets/Settings/URP-Renderer.asset`
+(LightMode `Outline`, after opaques; added by `Setup`), not in the forward draw, which kept the SRP
+Batcher from batching. The renderer ships in the player: a shader change that relies on it needs a
+player build, not only a hot update.
 
 `unity run` adds `-batchmode -quit` itself; do not pass them. The player writes `[Boot]` and `[Hot]`
 lines to its log (`Relics.exe -logFile run.log`), so a run can be checked without reading the screen.
 
 Build products (`HybridCLRData/`, `Bundles/`, `Assets/HotRes/Dlls/`, `Assets/StreamingAssets/`,
 `artifacts/`) are not committed.
+
+## Resource cache and update failures
+
+The player caches downloaded bundles in `Application.persistentDataPath/yoo`
+(`%USERPROFILE%\AppData\LocalLow\bigtaoo\Relics\yoo` on Windows); delete it to start like a fresh
+install. A fresh install downloads nothing until the CDN has a version newer than the one built into
+the player. Failure handling (retries, download watchdog, resume, cache CRC check) is in
+`ResourceUpdater` / `Boot`, see design/07 §3.
+
+`tools/hotupdate/` reruns the failure tests:
+- `faulty_cdn.py` serves `artifacts/cdn` with a bandwidth cap, stalls or dropped connections, and
+  Range support. `python -m http.server` has no Range support, so resume cannot be tested on it.
+- `failure_scenario.py` runs the CDN and the player on a timeline and prints the `[Boot]` lines.
+
+Example, CDN down for 40 s in the middle of a download:
+
+```bash
+python tools/hotupdate/failure_scenario.py outage 90 --fresh --cdn "--rate 100" --at 5 kill --at 45 start
+```

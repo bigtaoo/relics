@@ -27,6 +27,7 @@ namespace Automatic.Editor
             ConfigurePlayer();
             ConfigureHybridClr();
             EnsureRenderPipeline();
+            EnsureOutlinePass();
             EnsureHotResources();
             ConfigureCollector();
             EnsureBootScene();
@@ -70,6 +71,37 @@ namespace Automatic.Editor
             AssetDatabase.CreateAsset(pipeline, "Assets/Settings/URP-Pipeline.asset");
             GraphicsSettings.defaultRenderPipeline = pipeline;
             QualitySettings.renderPipeline = pipeline;
+        }
+
+        /// <summary>
+        /// Draws every "Outline" pass of Relics/Toon in one go after the opaques. Left in the forward
+        /// draw, URP renders each object's forward and outline passes back to back, the shader switches
+        /// on every draw and the SRP Batcher cannot batch: 234 SetPass calls on the full board instead
+        /// of 6 (design/08 §2). The renderer ships in the player, so this is a shell change.
+        /// </summary>
+        private static void EnsureOutlinePass()
+        {
+            const string featureName = "Toon Outline";
+            var renderer = AssetDatabase.LoadAssetAtPath<UniversalRendererData>("Assets/Settings/URP-Renderer.asset");
+            if (renderer.rendererFeatures.Exists(f => f != null && f.name == featureName)) return;
+            var feature = ScriptableObject.CreateInstance<RenderObjects>();
+            feature.name = featureName;
+            feature.settings.passTag = featureName;
+            feature.settings.Event = RenderPassEvent.AfterRenderingOpaques;
+            feature.settings.filterSettings.RenderQueueType = RenderQueueType.Opaque;
+            feature.settings.filterSettings.LayerMask = ~0;
+            feature.settings.filterSettings.PassNames = new[] { "Outline" };
+            AssetDatabase.AddObjectToAsset(feature, renderer);
+            AssetDatabase.TryGetGUIDAndLocalFileIdentifier(feature, out _, out long localId);
+            var so = new SerializedObject(renderer);
+            var features = so.FindProperty("m_RendererFeatures");
+            var map = so.FindProperty("m_RendererFeatureMap");
+            features.InsertArrayElementAtIndex(features.arraySize);
+            features.GetArrayElementAtIndex(features.arraySize - 1).objectReferenceValue = feature;
+            map.InsertArrayElementAtIndex(map.arraySize);
+            map.GetArrayElementAtIndex(map.arraySize - 1).longValue = localId;
+            so.ApplyModifiedProperties();
+            EditorUtility.SetDirty(renderer);
         }
 
         private static void EnsureHotResources()
