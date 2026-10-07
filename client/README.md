@@ -123,6 +123,8 @@ player build, not only a hot update.
 
 `unity run` adds `-batchmode -quit` itself; do not pass them. The player writes `[Boot]` and `[Hot]`
 lines to its log (`Relics.exe -logFile run.log`), so a run can be checked without reading the screen.
+With `-nographics` (no graphics device) `-hotcheck` logs `cube color 000000`; check the
+color with `-batchmode` alone.
 
 Build products (`HybridCLRData/`, `Bundles/`, `Assets/HotRes/Dlls/`, `Assets/StreamingAssets/`,
 `artifacts/`) are not committed.
