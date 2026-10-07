@@ -55,8 +55,8 @@ namespace Automatic.Editor
 
         /// <summary>
         /// CI bakes the shell version and build number into the player (design/09 §3): a shell left
-        /// at the project's version would look like a dev build. `-shellVersion X.Y.N -buildNumber N`;
-        /// `-appleTeam ID` turns on automatic signing for that team (the workflow signs with it).
+        /// at the project's version would look like a dev build. `-shellVersion X.Y.N -buildNumber N`.
+        /// Signing is not set here: the workflow patches the exported Xcode project.
         /// </summary>
         private static void BakeCiVersion()
         {
@@ -67,12 +67,6 @@ namespace Automatic.Editor
             {
                 PlayerSettings.iOS.buildNumber = build;
                 PlayerSettings.Android.bundleVersionCode = int.Parse(build);
-            }
-            var team = Arg("-appleTeam");
-            if (team != null)
-            {
-                PlayerSettings.iOS.appleDeveloperTeamID = team;
-                PlayerSettings.iOS.appleEnableAutomaticSigning = true;
             }
         }
 

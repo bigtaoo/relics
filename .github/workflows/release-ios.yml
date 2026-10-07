@@ -1,18 +1,23 @@
 name: iOS - Build & Release
 
-# design/09 §2: Unity exports the Xcode project on ubuntu (GameCI), macOS compiles, signs and uploads.
+# design/09 §2: one macOS job. GameCI exports the Xcode project (it installs Unity on macOS runners
+# itself), then xcodebuild compiles, signs and uploads. Modelled on two pipelines that ran:
+# SumQuest-OLD ios.yml (GameCI on macOS with Unity 6000.3, the per-target signing patch) and funny
+# release-ios.yml (certificate, profile, export options, upload).
 # Trigger: push a tag `ios-v*`, or run manually. destination `none` only compiles (no signing, no
 # upload), the check a Windows dev machine cannot do; it needs only the Unity secrets.
 #
 # Repo secrets (Settings -> Secrets and variables -> Actions):
-#   UNITY_EMAIL, UNITY_PASSWORD     Unity account of the Personal license (GameCI activation)
-#   UNITY_LICENSE                   contents of Unity_lic.ulf, if the Hub wrote one (GameCI docs)
+#   UNITY_EMAIL, UNITY_PASSWORD     Unity account of the Personal license
+#   UNITY_LICENSE                   contents of Unity_lic.ulf. Required: with email and password
+#                                   only, GameCI fails with "Missing Unity License File" (SumQuest-OLD,
+#                                   2026-03-16, Unity 6000.3).
 #   APPLE_TEAM_ID                   10-char Team ID
 #   BUILD_CERTIFICATE_BASE64        Apple Distribution cert (.p12) base64; P12_PASSWORD its password
 #   KEYCHAIN_PASSWORD               any string; temp keychain password on the runner
-#   ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_KEY_CONTENT_BASE64 (.p8 base64)
-#     App Store Connect API key (Admin or App Manager): xcodebuild signs automatically with it,
-#     registering the bundle id and creating the provisioning profile itself.
+#   BUILD_PROVISION_PROFILE_BASE64  App Store provisioning profile (.mobileprovision) of this bundle id
+#   PROVISIONING_PROFILE_NAME       the profile's name (as shown in the Developer portal)
+#   ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_KEY_CONTENT_BASE64 (.p8 base64)  upload only
 # The app record must exist in App Store Connect before the first upload.
 
 on:
@@ -34,18 +39,12 @@ env:
   # Shell version <X.Y>.<build> with build = run number (design/09 §3); X.Y matches ProjectSetup.
   MARKETING_VERSION: '0.1'
   SIGN: ${{ github.event_name == 'push' || inputs.destination != 'none' }}
+  XCODE_DIR: artifacts/player/iOS/Xcode
 
 jobs:
-  export:
-    runs-on: ubuntu-latest
+  build:
+    runs-on: macos-26
     steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@v1.3.1
-        with:
-          android: true
-          dotnet: false
-          large-packages: false
-
       - name: Checkout
         uses: actions/checkout@v5
         with:
@@ -74,41 +73,20 @@ jobs:
           customParameters: >-
             -shellVersion ${{ env.MARKETING_VERSION }}.${{ github.run_number }}
             -buildNumber ${{ github.run_number }}
-            ${{ env.SIGN == 'true' && format('-appleTeam {0}', secrets.APPLE_TEAM_ID) || '' }}
-
-      # One archive: the Xcode project has tens of thousands of files.
-      - name: Pack
-        run: |
-          sudo tar -C artifacts/player/iOS -czf xcode.tgz Xcode
-          sudo tar -C artifacts/cdn -czf cdn-ios.tgz iOS
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: xcode
-          path: xcode.tgz
-          retention-days: 3
 
       # The resource versions this shell was built with: unpack into artifacts/cdn on the dev PC so
       # the phone's CDN (tools/bench/phone_cdn.py) serves what the shell expects.
+      - name: Pack resources
+        run: tar -C artifacts/cdn -czf cdn-ios.tgz iOS
+
       - uses: actions/upload-artifact@v4
         with:
           name: cdn-ios
           path: cdn-ios.tgz
 
-  build:
-    needs: export
-    runs-on: macos-26
-    steps:
-      - uses: actions/download-artifact@v4
-        with:
-          name: xcode
-
-      - name: Unpack
-        run: tar -xzf xcode.tgz
-
       - name: Compile check (unsigned)
         if: env.SIGN != 'true'
-        working-directory: Xcode
+        working-directory: ${{ env.XCODE_DIR }}
         run: |
           xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
             -sdk iphoneos -destination generic/platform=iOS build CODE_SIGNING_ALLOWED=NO | tail -50
@@ -122,35 +100,82 @@ jobs:
           p12-password: ${{ secrets.P12_PASSWORD }}
           keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
 
+      - name: Install provisioning profile
+        if: env.SIGN == 'true'
+        run: |
+          PP_PATH=$RUNNER_TEMP/profile.mobileprovision
+          echo -n "${{ secrets.BUILD_PROVISION_PROFILE_BASE64 }}" | base64 --decode -o $PP_PATH
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          cp $PP_PATH ~/Library/MobileDevice/Provisioning\ Profiles/
+
+      # Manual signing per target, as SumQuest-OLD learned (exit 65 until it did this): the profile
+      # goes on the app target only. Passing PROVISIONING_PROFILE_SPECIFIER on the xcodebuild command
+      # line would also put it on UnityFramework, which cannot take one.
+      - name: Patch signing per target
+        if: env.SIGN == 'true'
+        working-directory: ${{ env.XCODE_DIR }}
+        env:
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          PROFILE: ${{ secrets.PROVISIONING_PROFILE_NAME }}
+        run: |
+          gem install xcodeproj --no-document
+          ruby - <<'RUBY'
+            require 'xcodeproj'
+            project = Xcodeproj::Project.open('Unity-iPhone.xcodeproj')
+            app = project.targets.find { |t| t.name == 'Unity-iPhone' } or raise 'Unity-iPhone target not found'
+            fw = project.targets.find { |t| t.name == 'UnityFramework' } or raise 'UnityFramework target not found'
+            [app, fw].each do |target|
+              target.build_configurations.each do |cfg|
+                s = cfg.build_settings
+                s['DEVELOPMENT_TEAM'] = ENV['TEAM_ID']
+                s['CODE_SIGN_STYLE'] = 'Manual'
+                s['CODE_SIGN_IDENTITY'] = 'iPhone Distribution'
+                s['CODE_SIGN_IDENTITY[sdk=iphoneos*]'] = 'iPhone Distribution'
+                if target == app
+                  s['PROVISIONING_PROFILE_SPECIFIER'] = ENV['PROFILE']
+                else
+                  s.delete('PROVISIONING_PROFILE_SPECIFIER')
+                  s.delete('PROVISIONING_PROFILE')
+                end
+              end
+              attrs = project.root_object.attributes['TargetAttributes'] ||= {}
+              (attrs[target.uuid] ||= {})['ProvisioningStyle'] = 'Manual'
+            end
+            project.save
+            bundle = app.build_configurations.first.build_settings['PRODUCT_BUNDLE_IDENTIFIER']
+            File.write(ENV['GITHUB_ENV'], "BUNDLE_ID=#{bundle}\n", mode: 'a')
+          RUBY
+
       - name: Archive and export IPA
         if: env.SIGN == 'true'
-        working-directory: Xcode
+        working-directory: ${{ env.XCODE_DIR }}
         run: |
-          KEY=$RUNNER_TEMP/AuthKey.p8
-          echo -n "${{ secrets.ASC_API_KEY_CONTENT_BASE64 }}" | base64 --decode > $KEY
-          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID ${{ secrets.ASC_API_KEY_ID }} -authenticationKeyIssuerID ${{ secrets.ASC_API_ISSUER_ID }}"
           cat > $RUNNER_TEMP/ExportOptions.plist << EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
           <plist version="1.0">
           <dict>
               <key>method</key>
-              <string>app-store-connect</string>
+              <string>app-store</string>
               <key>teamID</key>
               <string>${{ secrets.APPLE_TEAM_ID }}</string>
-              <key>signingStyle</key>
-              <string>automatic</string>
               <key>uploadSymbols</key>
               <true/>
+              <key>signingStyle</key>
+              <string>manual</string>
+              <key>provisioningProfiles</key>
+              <dict>
+                  <key>${BUNDLE_ID}</key>
+                  <string>${{ secrets.PROVISIONING_PROFILE_NAME }}</string>
+              </dict>
           </dict>
           </plist>
           EOF
           xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
-            -destination generic/platform=iOS -archivePath $RUNNER_TEMP/Relics.xcarchive archive \
-            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} $AUTH | tail -50
+            -sdk iphoneos -archivePath $RUNNER_TEMP/Relics.xcarchive archive COMPILER_INDEX_STORE_ENABLE=NO | tail -50
           test ${PIPESTATUS[0]} -eq 0
           xcodebuild -exportArchive -archivePath $RUNNER_TEMP/Relics.xcarchive \
-            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist -exportPath $RUNNER_TEMP/ipa $AUTH
+            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist -exportPath $RUNNER_TEMP/ipa
 
       - name: Upload IPA artifact
         if: env.SIGN == 'true'
