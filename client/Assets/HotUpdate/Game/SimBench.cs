@@ -9,7 +9,7 @@ namespace Automatic.Game
 {
     /// <summary>
     /// Battle logic stress test in the player (design/08 §2): the same CrowdBattle as tools/SimBench,
-    /// here inside the HybridCLR interpreter, since Battle.Core is hot code. Started with -simbench;
+    /// here IL2CPP native, since Battle.Core is in the shell (ADR-010). Started with -simbench;
     /// -seeds N battles per scenario (default 3). Logs "[SimBench]" lines and quits. A whole battle's
     /// time is what catching up costs when switching to another battle at its end (design/01 §4); the
     /// worst tick is what the live battle costs in one frame.

@@ -16,6 +16,11 @@
   <assembly fullname="UnityEngine.UIModule" preserve="all" />
   <assembly fullname="UnityEngine.TextRenderingModule" preserve="all" />
   <assembly fullname="UnityEngine.InputLegacyModule" preserve="all" />
+  <!--
+    The battle core is shell code (ADR-010) but only hot code calls it: without this IL2CPP strips
+    whatever the hot code of the moment does not reference, and the next hot update could not use it.
+  -->
+  <assembly fullname="Automatic.Battle.Core" preserve="all" />
   <!-- Raw JNI for launch arguments and device temperature on Android (hot Jni.cs). -->
   <assembly fullname="UnityEngine.AndroidJNIModule" preserve="all" />
 </linker>

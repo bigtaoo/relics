@@ -8,7 +8,7 @@ Unity 6.3 LTS (6000.3.x), URP, IL2CPP on all platforms. Hot update: HybridCLR (c
 | Path | Assembly | Hot update |
 |---|---|---|
 | `Assets/Boot/` | `Automatic.Boot` | No (AOT shell). Must never reference hot assemblies |
-| `Packages/` → `src/Battle.Core` | `Automatic.Battle.Core` | Yes |
+| `Packages/` → `src/Battle.Core` | `Automatic.Battle.Core` | No: compiled into the shell, 12x faster than interpreted (ADR-010). A core change needs a new player build; `BuildHotUpdate` refuses to publish one (`ShellCore`) |
 | `Assets/HotUpdate/Game/` | `Automatic.Game` | Yes. Entry: `Automatic.Game.GameEntry.Start()` |
 | `Assets/HotRes/` | — | Yes. Everything here is collected into the YooAsset package `DefaultPackage`: one bundle per folder, with each folder's materials and textures in bundles of their own (`MaterialPackRule.cs`) |
 | `Assets/Editor/` | `Automatic.Editor` | Editor only: setup and build menus |
@@ -66,7 +66,7 @@ The check below now needs `-hotcheck` on the player command line (the default st
    python -m http.server 8000 --directory artifacts/cdn
    ```
 
-4. Run `Relics.exe -hotcheck`: same cube, all `PASS` (now inside the HybridCLR interpreter).
+4. Run `Relics.exe -hotcheck`: same cube, all `PASS` (hot code calling the core in the shell).
 5. Change `GameEntry.BuildLabel` and the color of `Assets/HotRes/Bronze.mat`, then
    `Automatic/2. Build Hot Update`. Restart `Relics.exe -hotcheck` without rebuilding it: new label and color.
 
@@ -105,7 +105,7 @@ sets up `adb reverse tcp:8000 tcp:8000` for the local CDN, runs the cases and ke
 lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`ProjectSetup`).
 
 Battle logic test (design/10): `-simbench [-seeds N]` runs the `CrowdBattle` stress prototype of
-Battle.Core (8v8, summon build, 300 units) inside the HybridCLR interpreter and logs `[SimBench]`
+Battle.Core (8v8, summon build, 300 units), IL2CPP native since the core is in the shell, and logs `[SimBench]`
 lines with the time per battle, the worst tick and the end hash against the golden values, then
 quits. Works with `-batchmode -nographics`. The same scenarios on .NET: `dotnet run -c Release
 --project tools/SimBench`. `BuildPlayer -release` (editor command line) builds a non-development

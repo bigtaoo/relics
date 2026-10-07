@@ -10,11 +10,17 @@ namespace Automatic.Boot
     {
         public const string PackageName = "DefaultPackage";
 
-        /// <summary>AOT assemblies whose metadata the interpreter needs for generics (design/07 §4).</summary>
-        public static readonly string[] AotMetadataAssemblies = { "mscorlib", "System", "System.Core" };
+        /// <summary>
+        /// AOT assemblies whose metadata the interpreter needs for generics (design/07 §4). Battle.Core
+        /// is in the shell (ADR-010): hot code may instantiate its generics, e.g. Prng.Shuffle&lt;T&gt;.
+        /// </summary>
+        public static readonly string[] AotMetadataAssemblies = { "mscorlib", "System", "System.Core", "Automatic.Battle.Core" };
 
-        /// <summary>Hot update assemblies, in load order (dependencies first).</summary>
-        public static readonly string[] HotUpdateAssemblies = { "Automatic.Battle.Core", "Automatic.Game" };
+        /// <summary>
+        /// Hot update assemblies, in load order (dependencies first). Not Battle.Core: native it runs
+        /// 12 times faster than interpreted (design/10), so it ships with the shell.
+        /// </summary>
+        public static readonly string[] HotUpdateAssemblies = { "Automatic.Game" };
 
         public const string EntryType = "Automatic.Game.GameEntry";
         public const string EntryMethod = "Start";

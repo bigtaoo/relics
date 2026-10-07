@@ -28,8 +28,10 @@ namespace Automatic.Editor
             Build(target, NextVersion(target), EBundledCopyOption.None);
         }
 
-        public static string Build(BuildTarget target, string version, EBundledCopyOption bundledCopy)
+        /// <param name="newShell">Built for a player build that ships its own Battle.Core: skips the core check.</param>
+        public static string Build(BuildTarget target, string version, EBundledCopyOption bundledCopy, bool newShell = false)
         {
+            if (!newShell) ShellCore.Check(target);
             CompileDllCommand.CompileDll(target);
             CheckShellApi(target);
             CopyDlls(SettingsUtil.GetHotUpdateDllsOutputDirByTarget(target), BootConfig.HotUpdateAssemblies);

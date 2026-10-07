@@ -12,7 +12,7 @@
 | [07-hot-update.md](07-hot-update.md) | 客户端热更方案（代码 + 资源） | 草案 |
 | [08-art-slice.md](08-art-slice.md) | 美术流程验证：1 角色 + 1 场景 + 1 UI | 草案 |
 | [09-build-release.md](09-build-release.md) | 构建与发布：CI 流水线、版本线、各平台注意事项 | 草案 |
-| [10-battle-perf.md](10-battle-perf.md) | 战斗逻辑性能：召唤流 300 单位、服务器容量、解释器与原生对比 | 原型实测，方案待定 |
+| [10-battle-perf.md](10-battle-perf.md) | 战斗逻辑性能：召唤流 300 单位、服务器容量、解释器与原生对比 | 原型实测；Core 已编进壳（ADR-010） |
 | [DECISIONS.md](DECISIONS.md) | 架构决策记录（ADR） | 持续更新 |
 
 规则：结论 + 理由 + 影响；单文件不超过 500 行；改代码前先改文档。

@@ -18,7 +18,6 @@ MonoBehaviour:
   il2cppPlusRepoURL: https://gitee.com/focus-creative-games/il2cpp_plus
   hotUpdateAssemblyDefinitions: []
   hotUpdateAssemblies:
-  - Automatic.Battle.Core
   - Automatic.Game
   preserveHotUpdateAssemblies: []
   hotUpdateDllCompileOutputRootDir: HybridCLRData/HotUpdateDlls
@@ -28,6 +27,7 @@ MonoBehaviour:
   - mscorlib.dll
   - System.dll
   - System.Core.dll
+  - Automatic.Battle.Core.dll
   outputLinkFile: HybridCLRGenerate/link.xml
   outputAOTGenericReferenceFile: HybridCLRGenerate/AOTGenericReferences.cs
   maxGenericReferenceIteration: 10

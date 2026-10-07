@@ -24,7 +24,7 @@ namespace Automatic.Editor
         {
             // Generates link.xml, bridge functions and the stripped AOT dlls used as metadata.
             PrebuildCommand.GenerateAll();
-            var version = HotUpdateBuild.Build(target, HotUpdateBuild.NextVersion(target), YooAsset.Editor.EBundledCopyOption.ClearAndCopyAll);
+            var version = HotUpdateBuild.Build(target, HotUpdateBuild.NextVersion(target), YooAsset.Editor.EBundledCopyOption.ClearAndCopyAll, newShell: true);
 
             var release = System.Environment.GetCommandLineArgs().Contains("-release");
             var dir = Path.Combine(HotUpdateBuild.RepoRoot, "artifacts", "player", HotUpdateBuild.PlatformFolder(target) + (release ? "-release" : ""));
@@ -43,6 +43,7 @@ namespace Automatic.Editor
                 var report = BuildPipeline.BuildPlayer(options);
                 if (report.summary.result != BuildResult.Succeeded)
                     throw new BuildFailedException($"Player build {report.summary.result}");
+                ShellCore.Record(target);
             }
             finally
             {

@@ -5,7 +5,8 @@ using Automatic.Battle.Math;
 namespace Automatic.Game
 {
     /// <summary>
-    /// Runs the core's golden values inside the interpreter on device (design/07 §7 step 4).
+    /// Runs the core's golden values on device (design/07 §7 step 4): hot code calling the core
+    /// compiled into the shell (ADR-010).
     /// Values are copied from tests/Battle.Core.Tests; keep them in sync.
     /// </summary>
     public static class GoldenSelfCheck

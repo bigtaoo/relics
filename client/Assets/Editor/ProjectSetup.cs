@@ -1,4 +1,5 @@
 using System.IO;
+using System.Linq;
 using Automatic.Boot;
 using HybridCLR.Editor.Settings;
 using UnityEditor;
@@ -59,7 +60,7 @@ namespace Automatic.Editor
             var s = HybridCLRSettings.Instance;
             s.enable = true;
             s.hotUpdateAssemblies = BootConfig.HotUpdateAssemblies;
-            s.patchAOTAssemblies = new[] { "mscorlib.dll", "System.dll", "System.Core.dll" };
+            s.patchAOTAssemblies = BootConfig.AotMetadataAssemblies.Select(n => n + ".dll").ToArray();
             HybridCLRSettings.Save();
         }
 

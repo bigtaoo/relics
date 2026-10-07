@@ -1,7 +1,7 @@
 # 10 · 战斗逻辑性能（召唤流 300 单位）
 
 > 状态：原型实测（2026-10-07）。三战规则还没还原（02），这里用的是一套代替规则的压测原型，回答两个问题：**服务器一核能跑多少局**，**手机上算一场 300 单位的战斗要多久**。
-> 结论先行：服务器不是问题；**手机端的战斗核心不能留在热更解释器里跑召唤流**，要定方案（§4）。
+> 结论先行：服务器不是问题；手机端的战斗核心不能留在热更解释器里跑召唤流。**已决定把 Core 编进壳（方案 A，ADR-010）**，以后可升级到 DHE（方案 B）。
 
 ## 1. 压测原型
 
@@ -58,7 +58,7 @@ A16 的大核单核大约是开发本大核的 1/3～1/4（推算，真机待测
 - **自己的战斗**：边播边算的话，解释器每帧要多花约 11 ms，30 fps 的帧预算一共才 33 ms。
 - 发热：解释器多烧 10 倍 CPU，召唤流对局会明显更烫。
 
-## 4. 方案（待定，需要决定）
+## 4. 方案（2026-10-07 定为 A，见 ADR-010）
 
 | 方案 | 做法 | 好处 | 代价 |
 |---|---|---|---|
@@ -75,19 +75,29 @@ HybridCLR 的版本（官网 2026-10 查到的说法）：
 
 §2 已经验证过：同一份 Core 在原生和解释器下结果逐位一致，所以 DHE 下一部分函数跑原生、一部分跑解释器，不会影响确定性。
 
-建议 **A 或 B，再加 D**：Core 原生编译，解决每 tick 的开销和发热。A 和 B 的代码结构完全一样，区别只在打包配置和授权，所以可以先按 A 开发，上线前再决定要不要买 B；召唤流的观战快进再用快照或后台线程兜底，因为原生下仍要约 0.8 秒。
-A 意味着 ADR-008 中「Battle.Core 放在热更层」要改。数据驱动本来就是 03 的目标（换皮只改数据），所以平时的数值调整仍然只发热更。
+商业版没有试用，要用公司邮箱询价、签约后才提供代码，所以先做 A。
+
+当时的建议是 **A 或 B，再加 D**：Core 原生编译，解决每 tick 的开销和发热。A 和 B 的代码结构完全一样，区别只在打包配置和授权，所以可以先按 A 开发，上线前再决定要不要买 B；召唤流的观战快进再用快照或后台线程兜底，因为原生下仍要约 0.8 秒。
+A 改了 ADR-008 中「Battle.Core 放在热更层」一条。数据驱动本来就是 03 的目标（换皮只改数据），战法数据放进单独的热更程序集（03 §7），平时的数值调整仍然只发热更。D 等写观战时再做。
+
+### A 的落地（2026-10-07）
+
+- `BootConfig.HotUpdateAssemblies` 只剩 `Automatic.Game`；Core 加进补充元数据列表（`AotMetadataAssemblies`），热更代码可以实例化它的泛型（如 `Prng.Shuffle<T>`）。
+- `Assets/Boot/link.xml` 整体保留 Core：壳里只有热更代码调用 Core，不保留的话，打壳时没用到的部分会被裁掉，下一次热更就调不到了。
+- 打壳时记下 `src/Battle.Core` 源码的哈希（`HybridCLRData/ShellCore/{平台}.txt`），构建热更时对比，Core 改了就拒绝发布（`ShellCore`）。
+- PC 开发版实测：summon300 一场 218 ms（解释器开发版 3154 ms），crowd300 107 ms，三项哈希 PASS；`-hotcheck` 7 项黄金值全部 PASS，包括热更代码调用 Core 的泛型 `Shuffle<int>`。临时改一行 Core 再构建热更，被拒绝，CDN 版本不变。
+- 安卓：现有 APK 的 Core 还是热更的，手机到了要先重新打 APK（`android.sh --install`）。
 
 ## 5. 复现
 
 ```bash
 dotnet run -c Release --project tools/SimBench            # 服务端：各场景耗时、确定性、单核和全核吞吐
 artifacts/player/PC/Relics.exe -simbench -seeds 3 -batchmode -nographics -logFile sim.log
-tools/bench/android.sh sim                                 # 安卓真机（需要 0.1.0.1 及以后的热更包）
+tools/bench/android.sh sim                                 # 安卓真机（要用 Core 编进壳之后打的 APK）
 ```
 
 正式版（非开发版）的包：`unity run client ... -executeMethod Automatic.Editor.Batch.BuildPlayer -release`，输出到 `artifacts/player/PC-release`。
-测 IL2CPP 原生时，临时把 `Automatic.Battle.Core` 从 `BootConfig.HotUpdateAssemblies` 和 `ProjectSettings/HybridCLRSettings.asset` 里去掉，打完改回来，再发一次热更。
+现在的包里 Core 就是原生的。要重测解释器，临时把 `Automatic.Battle.Core` 加回 `BootConfig.HotUpdateAssemblies`（排在 `Automatic.Game` 前面）并从 `AotMetadataAssemblies` 去掉，跑 `Setup` 同步 HybridCLR 设置，打完改回来。
 
 ## 6. 待做
 
