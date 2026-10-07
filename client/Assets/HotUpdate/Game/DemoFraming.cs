@@ -41,20 +41,26 @@ namespace Automatic.Game
         }
 
         /// <summary>
-        /// The player's half and bench (z from -halfDepth to `top`) in the free area: right of the
-        /// hand panel, above the shop tray, below the round bar. Returns the camera position and the
-        /// centre of the free area in canvas coordinates (where the hu seal lands).
+        /// The PC HUD's free area (viewport units) for a canvas of `size`: right of the hand panel,
+        /// above the shop tray, below the round bar.
         /// </summary>
-        public static (Vector3 Position, Vector3 HuCentre) Prep(Camera cam, float halfWidth, float halfDepth, float top, Vector2 size)
+        public static Rect PcFree(Vector2 size) =>
+            Rect.MinMaxRect((24 + 430 + 16) / size.x, (12 + 290 + 8) / size.y, 1 - 16 / size.x, 1 - 96 / size.y);
+
+        /// <summary>The player's half and bench (z from -halfDepth to `top`) fitted into `free` (viewport units).</summary>
+        public static Vector3 Prep(Camera cam, float halfWidth, float halfDepth, float top, Rect free) =>
+            Fit(cam, halfWidth, -halfDepth, top, 0.9f, free);
+
+        /// <summary>The table from z `near` to `far` (pieces up to `height`) fitted into `rect` (viewport units).</summary>
+        public static Vector3 Fit(Camera cam, float halfWidth, float near, float far, float height, Rect rect)
         {
-            var free = Rect.MinMaxRect((24 + 430 + 16) / size.x, (12 + 290 + 8) / size.y, 1 - 16 / size.x, 1 - 96 / size.y);
             var points = new List<Vector3>();
             foreach (var x in new[] { -halfWidth, halfWidth })
-                foreach (var z in new[] { -halfDepth, top })
-                    foreach (var y in new[] { 0f, 0.9f })
+                foreach (var z in new[] { near, far })
+                    foreach (var y in new[] { 0f, height })
                         points.Add(new Vector3(x, y, z));
-            FitInto(cam, points, free);
-            return (cam.transform.position, new Vector3((free.center.x - 0.5f) * size.x, 90, 0));
+            FitInto(cam, points, rect);
+            return cam.transform.position;
         }
 
         /// <summary>Moves the camera (fixed rotation) so the points' screen bounds fill `rect` (viewport units).</summary>

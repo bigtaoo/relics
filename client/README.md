@@ -37,6 +37,11 @@ artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-h
 player has no image encoder module), then quits. To check that something moves, diff two
 frames of the same phase (e.g. `0.0` and `0.3`, both before the click lands).
 
+Phones get their own HUD scale and layout (`PhoneLayout.cs`, art/ui/README.md §5.1). To see it on
+PC, open the window at the phone's aspect and name the phone: `-device iphone13|a16 -layout A|B|C`
+(e.g. `-screen-width 1560 -screen-height 720`). With `-autoplay` the log has the on-screen size of
+the board cells (`[Demo] ... front-row cell`).
+
 Art in `Assets/HotRes/` (models, clips, prefabs) only needs `BuildHotUpdate`; the player picks up
 the new version on its next start. Player settings stay as built: `runInBackground` is on, since
 an unfocused player otherwise pauses at `[Boot] Initializing`.

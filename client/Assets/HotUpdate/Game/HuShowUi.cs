@@ -22,6 +22,16 @@ namespace Automatic.Game
         public static float SealAt(int pieces) => LightAt(pieces - 1) + 0.15f;
 
         public readonly RectTransform Shop, Card;
+
+        /// <summary>
+        /// How far the shop tray is out (0 hidden below the screen, 1 in place). Phones with the
+        /// shop on demand (PhoneLayout) start it at 0; the battle start slides it away either way.
+        /// </summary>
+        public float TrayOpen = 1;
+
+        /// <summary>Size of the hu show in the middle (phones scale it down, PhoneLayout).</summary>
+        public float HuScale = 1;
+
         private readonly RectTransform tray, slot, hu;
         private readonly Transform entry, seal;
         private readonly Transform[] tiles;
@@ -31,7 +41,7 @@ namespace Automatic.Game
         private readonly Color ink, dashColor, dashTextColor;
         private readonly string waitingChar, waitingLine, prepRound;
         private readonly Vector3 home;
-        private readonly float trayY;
+        private readonly float trayY, cardScale;
         private readonly int pieces;
 
         public HuShowUi(RectTransform shop, int card)
@@ -40,6 +50,7 @@ namespace Automatic.Game
             tray = (RectTransform)shop.Find("ShopTray");
             Card = (RectTransform)tray.Find("Card" + card);
             home = Card.localPosition;
+            cardScale = Card.localScale.x;
             glow = Card.Find("Glow").GetComponent<Image>();
             entry = shop.Find("HandPanel/Hand0");
             pieces = 0;
@@ -86,7 +97,8 @@ namespace Automatic.Game
             var u = Smooth(Mathf.InverseLerp(FlyStart, FlyEnd, t));
             if (flying) Card.localPosition = Vector3.Lerp(from, target, u) + Vector3.up * 160 * Mathf.Sin(u * Mathf.PI);
             var press = t < Press || t >= FlyStart ? 1 : 1 - 0.07f * Mathf.Sin(Mathf.InverseLerp(Press, FlyStart, t) * Mathf.PI);
-            Card.localScale = Vector3.one * press * Mathf.Lerp(1, slot.rect.height / Card.rect.height, u);
+            // Layouts may scale the cards and the hand panel (PhoneLayout): land at the tile's size on screen.
+            Card.localScale = Vector3.one * press * Mathf.Lerp(cardScale, slot.rect.height * InShop(slot) / Card.rect.height, u);
             Card.gameObject.SetActive(t < FlyEnd);
 
             // The empty tile becomes a real one; then the tiles turn over in step with the pieces on the board.
@@ -114,9 +126,11 @@ namespace Automatic.Game
                 text.alpha = Mathf.InverseLerp(0.35f, 0.55f, stamp);
             var dock = Smooth(Mathf.InverseLerp(Hold, Dock, t));
             // The seal docks onto the small seal of the status line (40 px, at 40,-20 in the line).
-            var statusAt = Shop.InverseTransformPoint(statusLine.transform.parent.TransformPoint(new Vector3(40, -20, 0))) - new Vector3(0, 80 * 0.13f, 0);
+            // (300 px seal, so 0.13 of it; less where the panel is scaled down.)
+            var docked = 0.13f * InShop(statusLine.transform.parent);
+            var statusAt = Shop.InverseTransformPoint(statusLine.transform.parent.TransformPoint(new Vector3(40, -20, 0))) - new Vector3(0, 80 * docked, 0);
             hu.localPosition = Vector3.Lerp(huCentre, statusAt, dock);
-            hu.localScale = Vector3.one * Mathf.Lerp(1, 0.13f, dock);
+            hu.localScale = Vector3.one * Mathf.Lerp(HuScale, docked, dock);
             var shake = stamp is > 0.1f and < 0.4f ? 7 * Mathf.Exp(-(stamp - 0.1f) * 12) * Mathf.Sin(stamp * 90) : 0;
             Shop.anchoredPosition = new Vector2(shake, shake * 0.6f);
 
@@ -125,12 +139,15 @@ namespace Automatic.Game
             statusLine.text = formed ? "已成　战斗中发动" : waitingLine;
 
             // Battle start: the shop tray slides off and the round bar switches to the battle.
-            var slide = Smooth(Mathf.InverseLerp(Fight, Fight + 0.35f, t));
+            var slide = Mathf.Max(Smooth(Mathf.InverseLerp(Fight, Fight + 0.35f, t)), 1 - TrayOpen);
             tray.anchoredPosition = new Vector2(tray.anchoredPosition.x, trayY - slide * (tray.rect.height + 40));
             round.text = t < Fight ? prepRound : prepRound.Replace("准备", "战斗");
         }
 
         public static float Smooth(float x) => x * x * (3 - 2 * x);
+
+        /// <summary>Scale of `t` relative to the shop root.</summary>
+        private float InShop(Transform t) => t.lossyScale.x / Shop.lossyScale.x;
 
         private static void SetAlpha(Graphic g, float a)
         {
