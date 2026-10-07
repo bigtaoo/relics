@@ -7,7 +7,7 @@ namespace Automatic.Game
     /// <summary>
     /// Launch switches (-bench, -crowd N, ...). On desktop they are the process command line. On
     /// Android they come from the intent extra Unity also reads its own player arguments from:
-    /// `adb shell am start -n com.bigtaoo.Relics/com.unity3d.player.UnityPlayerGameActivity -e unity "-bench -crowd 254"`.
+    /// `adb shell am start -n com.gamestao.relics/com.unity3d.player.UnityPlayerGameActivity -e unity "-bench -crowd 254"`.
     /// Read through raw JNI calls, so the hot code needs no AOT generic instantiations.
     /// On iOS (no command line, no adb) they come from the link that opened the app:
     /// relics://run?cdn=http://192.168.1.20:8000&amp;name=vat254&amp;args=-bench+-crowd+254+-vat.

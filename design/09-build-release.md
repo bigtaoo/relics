@@ -89,7 +89,8 @@
 
 ## 5. 待办
 
-- [ ] 确定 Bundle ID / Steam App ID / Android 包名（上架后不可改）。现在用的是占位的 `com.bigtaoo.Relics`
+- [x] Bundle ID 和 Android 包名：`com.gamestao.relics`（2026-10-07 定，上架后不可改；在 `ProjectSetup` 里设置）。`companyName` 还是 `bigtaoo`，因为它决定本地数据目录（`LocalLow/bigtaoo/Relics`）
+- [ ] 确定 Steam App ID
 - [ ] Apple：在开发者后台注册 Bundle ID，生成这个 Bundle ID 的 App Store 描述文件；在 App Store Connect 新建 App 记录。把 funny 的签名证书、Team ID、ASC API Key，加上新的描述文件，存进本仓库的 Secrets（Secrets 的值不能跨仓库复制，要重新填）。名单见 `release-ios.yml` 文件头
 - [ ] Steam：注册 App（Steam Direct 费用），建 depot 和 beta 分支
 - [ ] Unity 授权接入 CI：配 `UNITY_EMAIL` / `UNITY_PASSWORD` / `UNITY_LICENSE`（`Unity_lic.ulf` 的内容，必需），先跑一次 `destination: none`

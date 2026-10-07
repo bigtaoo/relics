@@ -40,6 +40,9 @@ namespace Automatic.Editor
         {
             PlayerSettings.companyName = "bigtaoo";
             PlayerSettings.productName = "Relics";
+            // Store id, fixed once released (design/09 §5). companyName stays: it names the data folders.
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.iOS, "com.gamestao.relics");
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.gamestao.relics");
             // Shell version; CI overwrites it (design/09 §3). Never ship 0.0.0.
             PlayerSettings.bundleVersion = "0.1.0";
             foreach (var target in new[] { NamedBuildTarget.Standalone, NamedBuildTarget.Android, NamedBuildTarget.iOS })

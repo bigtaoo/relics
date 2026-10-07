@@ -14,7 +14,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 ADB=${ADB:-/d/play/Editor/6000.3.25f1/Editor/Data/PlaybackEngines/AndroidPlayer/SDK/platform-tools/adb.exe}
-PKG=${PKG:-com.bigtaoo.Relics}
+PKG=${PKG:-com.gamestao.relics}
 ACTIVITY=com.unity3d.player.UnityPlayerGameActivity
 OUT=artifacts/bench/android
 mkdir -p "$OUT"
