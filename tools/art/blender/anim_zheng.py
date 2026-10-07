@@ -8,6 +8,8 @@ from mathutils import Quaternion, Vector
 FPS = 30
 X, Y, Z = Vector((1, 0, 0)), Vector((0, 1, 0)), Vector((0, 0, 1))
 # Rotation about +Y pitches +X down: head/body "nod down" and legs swing backward.
+# hips is the root of the spine (spine, thighs and tails hang off it, pivot at the rump): -Y on
+# hips tips the whole body nose up, as when rearing; thighs then need +Y to stay under it.
 TAILS = [f"tail{t}" for t in range(1, 6)]
 TAIL_SIDE = {"tail1": -1, "tail2": -0.5, "tail3": 0, "tail4": 0.5, "tail5": 1}  # -Y side .. +Y side
 SPINE = ["hips", "spine", "chest", "neck", "head"]
@@ -117,63 +119,111 @@ def idle(t):
     return p, (0, 0.012 * sway, 0.014 * (br + 1) / 2)
 
 
-def attack(t):
+def leap(t):
+    """Pounce across the board (the presenter moves the unit along an arc, roughly 0.1..0.85):
+    crouch, spring with the body stretched out (forelegs reaching, hind legs kicked back),
+    tuck the legs in the air, land with a dip."""
     p = {}
-    wind, strike = bump(0, 0.3, 0.45, t), bump(0.3, 0.45, 0.85, t)
-    add(p, "hips", Y, 10 * wind - 6 * strike)
-    add(p, "chest", Y, -12 * wind + 14 * strike)
-    add(p, "neck", Y, -15 * wind + 10 * strike)
-    add(p, "head", Y, -10 * wind + 20 * strike)
-    add(p, "upperarm.L", Y, 25 * wind - 55 * strike)  # paw swipe forward
-    add(p, "forearm.L", Y, -40 * wind + 20 * strike)
-    add(p, "thigh.L", Y, -10 * wind)
-    add(p, "thigh.R", Y, -10 * wind)
-    tails_wave(p, t, amp=5 + 10 * strike, speed=2, spread=15 * strike)
-    return p, (-0.03 * wind + 0.06 * strike, 0, -0.02 * wind)
+    crouch, stretch = bump(0, 0.12, 0.3, t), bump(0.1, 0.3, 0.65, t)
+    tuck, land = bump(0.5, 0.7, 0.88, t), bump(0.8, 0.9, 1, t)
+    add(p, "hips", Y, 12 * crouch - 10 * stretch)
+    add(p, "chest", Y, 10 * crouch - 18 * stretch + 8 * land)
+    add(p, "neck", Y, 10 * crouch - 10 * stretch)
+    add(p, "head", Y, -12 * stretch + 10 * land)
+    for arm in ("upperarm.L", "upperarm.R"):
+        add(p, arm, Y, 30 * crouch - 60 * stretch + 35 * tuck)
+    for fore in ("forearm.L", "forearm.R"):
+        add(p, fore, Y, -30 * crouch + 15 * stretch - 50 * tuck)
+    for thigh in ("thigh.L", "thigh.R"):
+        add(p, thigh, Y, -25 * crouch + 55 * stretch - 30 * tuck)
+    for shin in ("shin.L", "shin.R"):
+        add(p, shin, Y, 30 * crouch - 25 * stretch + 45 * tuck)
+    tails_wave(p, t, amp=10, speed=1.5, spread=10, lift=20 * stretch - 10 * land)
+    return p, (0, 0, -0.04 * crouch - 0.03 * land)
+
+
+def attack(t):
+    """Claw and bite, 0.8 s, contact at 0.42: rears back with a paw raised (anticipation),
+    snaps forward fast, overshoots and holds the pose a beat, then settles."""
+    p = {}
+    wind = bump(0, 0.32, 0.42, t)
+    strike = ease(0.34, 0.42, t) * (1 - ease(0.62, 1, t))
+    over = bump(0.42, 0.48, 0.62, t)
+    add(p, "hips", Y, -14 * wind + 6 * strike)
+    add(p, "chest", Y, -20 * wind + 10 * strike + 4 * over)
+    add(p, "neck", Y, -25 * wind + 8 * strike)
+    add(p, "head", Y, -25 * wind + 15 * strike + 6 * over)
+    add(p, "head", Z, 10 * wind - 12 * strike)
+    add(p, "upperarm.L", Y, -75 * wind + 70 * strike)  # paw high, then raked down
+    add(p, "forearm.L", Y, 70 * wind - 30 * strike)
+    add(p, "upperarm.R", Y, -20 * wind + 25 * strike)
+    for thigh in ("thigh.L", "thigh.R"):
+        add(p, thigh, Y, 14 * wind - 12 * strike)
+    for shin in ("shin.L", "shin.R"):
+        add(p, shin, Y, 10 * wind + 15 * strike)
+    tails_wave(p, t, amp=8 + 12 * strike, speed=2, spread=30 * wind + 10 * strike, lift=-20 * wind)
+    return p, (-0.08 * wind + 0.14 * strike, 0, 0.05 * wind - 0.02 * strike)
 
 
 def cast(t):
+    """Five-tail flames, 1.5 s, release at 0.5 s (t = 0.33): rears up on the hind legs with the
+    tails fanned wide and raised, front paws beating; then throws the head and chest forward
+    as the flames leave the tail tips, and drops back to all fours."""
     p = {}
-    up = ease(0, 0.35, t) * (1 - ease(0.8, 1, t))
-    pulse = up * math.sin(2 * math.pi * 3 * t)
-    add(p, "hips", Y, 15 * up)       # sit back
-    add(p, "chest", Y, -20 * up)     # rear up
-    add(p, "neck", Y, -15 * up)
-    add(p, "head", Y, -20 * up + 3 * pulse)
-    add(p, "thigh.L", Y, -20 * up)
-    add(p, "thigh.R", Y, -20 * up)
-    add(p, "upperarm.L", Y, -30 * up)
-    add(p, "upperarm.R", Y, -20 * up)
-    add(p, "forearm.L", Y, 40 * up)
-    tails_wave(p, t, amp=10, speed=3, spread=25 * up, lift=-15 * up)
-    return p, (0, 0, 0.02 * up)
+    up = ease(0, 0.28, t) * (1 - ease(0.6, 0.95, t))
+    throw = bump(0.28, 0.36, 0.6, t)
+    paws = up * (1 - throw) * math.sin(2 * math.pi * 4 * t)
+    add(p, "hips", Y, -40 * up + 20 * throw)  # rear up from the rump
+    add(p, "chest", Y, -10 * up + 15 * throw)
+    add(p, "neck", Y, -15 * up + 20 * throw)
+    add(p, "head", Y, -10 * up + 30 * throw)
+    for thigh in ("thigh.L", "thigh.R"):
+        add(p, thigh, Y, 38 * up - 15 * throw)  # hind legs stay under the body
+    for shin in ("shin.L", "shin.R"):
+        add(p, shin, Y, 20 * up)
+    add(p, "upperarm.L", Y, -55 * up + 30 * throw + 15 * paws)
+    add(p, "upperarm.R", Y, -45 * up + 30 * throw - 15 * paws)
+    add(p, "forearm.L", Y, 60 * up - 20 * throw)
+    add(p, "forearm.R", Y, 50 * up - 20 * throw)
+    tails_wave(p, t, amp=8 + 6 * throw, speed=3, spread=40 * up, lift=-35 * up + 15 * throw)
+    return p, (-0.06 * up + 0.08 * throw, 0, 0.04 * up - 0.02 * throw)
 
 
 def hit(t):
+    """Knocked back, 0.5 s: snaps away from the blow in two frames, then a damped wobble."""
     p = {}
-    k = bump(0, 0.15, 1, t)
-    add(p, "chest", Y, -8 * k)
-    add(p, "neck", Y, -15 * k)
-    add(p, "head", Y, -20 * k)
-    add(p, "head", X, 10 * k)
-    tails_wave(p, t, amp=12 * k, speed=2, spread=-10 * k)
-    return p, (-0.04 * k, 0, 0)
+    k = ease(0, 0.08, t) * math.exp(-5 * max(0.0, t - 0.08))
+    wob = math.exp(-6 * t) * math.sin(2 * math.pi * 3 * t)
+    add(p, "chest", Y, -20 * k)
+    add(p, "neck", Y, -25 * k)
+    add(p, "head", Y, -35 * k + 8 * wob)
+    add(p, "head", X, 18 * k)
+    add(p, "hips", X, 8 * wob)
+    for thigh in ("thigh.L", "thigh.R"):
+        add(p, thigh, Y, 15 * k)
+    for arm in ("upperarm.L", "upperarm.R"):
+        add(p, arm, Y, -20 * k)
+    tails_wave(p, t, amp=18 * k + 6, speed=2, spread=-15 * k, lift=20 * k)
+    return p, (-0.12 * k, 0, 0.03 * k)
 
 
 def death(t):
+    """Staggers back from the killing blow, rears once, rolls onto its side and goes limp."""
     p = {}
-    fall, slump = ease(0.1, 0.6, t), ease(0.4, 0.9, t)
-    add(p, "root", X, 80 * fall)  # roll onto the right side
+    rear = bump(0, 0.15, 0.35, t)
+    fall, slump = ease(0.2, 0.55, t), ease(0.45, 0.85, t)
+    add(p, "chest", Y, -30 * rear)
+    add(p, "head", Y, -30 * rear + 25 * slump)
+    add(p, "root", X, 85 * fall)  # roll onto the right side
     add(p, "neck", Y, 20 * slump)
-    add(p, "head", Y, 25 * slump)
     for leg in ("thigh.L", "thigh.R"):
-        add(p, leg, Y, -30 * fall)
+        add(p, leg, Y, -30 * fall + 15 * rear)
     for leg in ("upperarm.L", "upperarm.R"):
-        add(p, leg, Y, 30 * fall)
+        add(p, leg, Y, 30 * fall - 30 * rear)
     for leg in ("shin.L", "shin.R", "forearm.L", "forearm.R"):
         add(p, leg, Y, 20 * slump)
-    tails_wave(p, t, amp=8 * (1 - slump), speed=1.5, lift=25 * slump)
-    return p, (0, 0, 0.12 * fall)  # lift by about half the body width so it lies on its side
+    tails_wave(p, t, amp=14 * (1 - slump), speed=1.5, lift=25 * slump)
+    return p, (-0.1 * rear, 0, 0.12 * fall + 0.04 * rear)
 
 
 def awaken(t):
@@ -195,8 +245,8 @@ def awaken(t):
     return p, (0, 0, 0.03 * rise)
 
 
-CLIPS = [("idle", 4.0, idle, True), ("attack", 1.0, attack, False), ("cast", 1.5, cast, False),
-         ("hit", 0.5, hit, False), ("death", 1.5, death, False), ("awaken", 2.0, awaken, False)]
+CLIPS = [("idle", 4.0, idle, True), ("attack", 0.8, attack, False), ("cast", 1.5, cast, False),
+         ("hit", 0.5, hit, False), ("leap", 0.4, leap, False), ("death", 1.5, death, False), ("awaken", 2.0, awaken, False)]
 
 
 def main(src, out):
@@ -205,7 +255,7 @@ def main(src, out):
     bpy.context.scene.render.fps = FPS
     for name, sec, fn, loop in CLIPS:
         c = Clip(arm, name, sec, loop)
-        c.sample(fn)
+        c.sample(fn, 1 if sec <= 1 else 2)  # fast moves need every frame
         c.push()
         print("CLIP", name, c.n + 1, "frames")
     bpy.ops.wm.save_as_mainfile(filepath=out)

@@ -24,6 +24,9 @@ namespace Automatic.Editor
         {
             AssetDatabase.Refresh();
             FxPrefabs.Build();
+            FxBattle.Build();
+            var (_, clips) = FxTimeline.OpenBoard();
+            BoardSlice.Controller(clips.Values); // states for clips added since the scene was built
             Ability();
             Hu();
         }

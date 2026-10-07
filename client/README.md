@@ -26,8 +26,9 @@ modules later), Visual Studio with the *Desktop development with C++* workload (
 ## Shop demo (design/08 §3)
 
 `Relics.exe` (and Play on `Assets/Boot/Boot.unity` in the editor) starts the playable UI slice:
-the board in the preparation phase with the shop. Click the glowing card to play the hu show and
-the battle start; click again or press R to start over, Esc quits. With the CDN running (below):
+the board in the preparation phase with the shop. Click the glowing card to play the hu show, the
+battle start and a scripted battle of about 16 s (`BattleScript.cs` / `BattleShow.cs`, art/fx/README.md
+§4); click again or press R to start over, Esc quits. With the CDN running (below):
 
 ```bash
 artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-height 900
@@ -35,7 +36,12 @@ artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-h
 
 `-autoplay <dir>` runs it by itself and saves screenshots along the timeline as raw RGB24 (the
 player has no image encoder module), then quits. To check that something moves, diff two
-frames of the same phase (e.g. `0.0` and `0.3`, both before the click lands).
+frames of the same phase (e.g. `0.0` and `0.3`, both before the click lands). The battle shots
+are taken at each act's blow, the hand going off, and the end.
+
+Hot code may only call engine API the shell kept: `Assets/Boot/link.xml` preserves the engine
+modules hot code is expected to use (design/07 §4). A `MissingMethodException` in the player log
+means the API was stripped from the shell: add its module there and rebuild the player.
 
 Phones get their own HUD scale and layout (`PhoneLayout.cs`, art/ui/README.md §5.1). To see it on
 PC, open the window at the phone's aspect and name the phone: `-device iphone13|a16 -layout A|B|C`

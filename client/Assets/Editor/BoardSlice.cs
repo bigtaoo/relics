@@ -157,15 +157,16 @@ namespace Automatic.Editor
             fg.transform.localScale = new Vector3(w * hp, h, 1);
         }
 
-        private static AnimatorController Controller(IEnumerable<AnimationClip> clips)
+        /// <summary>One state per clip, named after it, idle first; clips added to the FBX later get a state too.</summary>
+        internal static AnimatorController Controller(IEnumerable<AnimationClip> clips)
         {
             var path = ZhengDir + "zheng_anim.controller";
-            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path);
-            if (controller != null) return controller;
-            controller = AnimatorController.CreateAnimatorControllerAtPath(path);
+            var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path) ?? AnimatorController.CreateAnimatorControllerAtPath(path);
             var machine = controller.layers[0].stateMachine;
-            foreach (var clip in clips.OrderBy(c => c.name != "idle"))
+            var states = machine.states.Select(s => s.state.name).ToHashSet();
+            foreach (var clip in clips.OrderBy(c => c.name != "idle").Where(c => !states.Contains(c.name)))
                 machine.AddState(clip.name).motion = clip;
+            AssetDatabase.SaveAssets();
             return controller;
         }
 

@@ -15,7 +15,8 @@ namespace Automatic.Game
     /// Playable version of the UI slice (design/08 §3): the board scene in the preparation phase
     /// with the shop HUD over it. Clicking the glowing card plays the hu show (cards, tiles, seal,
     /// with the hand-formed effect on the board: only formed pieces come alive, 04 §6) and then
-    /// the battle start (tray away, camera to the whole table, the opponent arrives). Click or R
+    /// the battle start (tray away, camera to the whole table, the opponent arrives), then a short
+    /// scripted battle (BattleShow: attacks, the hand going off, a skill, deaths). Click or R
     /// afterwards to start over; -autoplay dir runs it by itself and saves screenshots. Everything
     /// is loaded from the resource package; the scene and the prefab carry no game scripts.
     /// </summary>
@@ -24,6 +25,8 @@ namespace Automatic.Game
         private const string Scene = "board_west", ShopPrefab = "ui_shop";
         private const string HuPiece = "fx_hu_piece", HuLink = "fx_hu_link", HuSeal = "fx_hu_seal";
         private const int HuCard = 2;
+        /// <summary>The battle (BattleShow) starts once the battle start has settled.</summary>
+        private const float BattleAt = HuShowUi.Finish + 0.2f;
 
         private sealed class Unit
         {
@@ -56,6 +59,7 @@ namespace Automatic.Game
         private PhoneLayout phone;
         private Rect freeAt;
         private float shopOpenAt = -1;
+        private BattleShow battle;
 
         public static void Run(ResourcePackage package)
         {
@@ -71,7 +75,7 @@ namespace Automatic.Game
             loading = true;
             var scene = package.LoadSceneAsync(Scene);
             yield return scene;
-            foreach (var name in new[] { ShopPrefab, HuPiece, HuLink, HuSeal })
+            foreach (var name in new[] { ShopPrefab, HuPiece, HuLink, HuSeal }.Concat(BattleShow.Prefabs))
                 if (!prefabs.ContainsKey(name)) prefabs[name] = package.LoadAssetSync<GameObject>(name).AssetObject as GameObject;
             Setup();
             loading = false;
@@ -99,6 +103,15 @@ namespace Automatic.Game
             }
             yield return new WaitForSeconds(0.2f);
             Click();
+            // Battle: each act's blow (attack contact, skill impact), the hand going off, the end.
+            var starts = BattleScript.Starts();
+            var battleShots = BattleScript.Acts.Select((a, i) => BattleAt + starts[i] + a.Kind switch
+            {
+                ActKind.Attack => 0.76f,
+                ActKind.Skill => 0.9f,
+                _ => 1.2f,
+            }).Append(BattleAt + starts[^1] + 0.6f);
+            shots = shots.Concat(battleShots).ToArray();
             foreach (var at in shots)
             {
                 while (Time.time - clickedAt + HuShowUi.Press < at) yield return null;
@@ -208,6 +221,9 @@ namespace Automatic.Game
             hint.text = "点击任意处重来（R）";
             hint.gameObject.SetActive(false);
 
+            BattleShow.Reset();
+            battle = new BattleShow(cam, units.Select(u => u.Root), hand.Select(u => u.Root), name => prefabs[name],
+                new BattlePops((RectTransform)hud, cam, shop), shop.Find("RoundBar/Round").GetComponent<TextMeshProUGUI>());
             events.Clear();
             fired = 0;
             clickedAt = shopOpenAt = -1;
@@ -246,7 +262,8 @@ namespace Automatic.Game
             {
                 foreach (var m in markers) m.gameObject.SetActive(true);
             }));
-            events.Add((HuShowUi.Finish + 0.3f, () => hint.gameObject.SetActive(true)));
+            events.Add((BattleAt, () => battle.Begin()));
+            events.Add((BattleAt + battle.End + 1.2f, () => hint.gameObject.SetActive(true)));
             events.Sort((x, y) => x.At.CompareTo(y.At));
         }
 
@@ -266,6 +283,7 @@ namespace Automatic.Game
             if (Input.GetKeyDown(KeyCode.Escape)) Application.Quit();
             if (Input.GetKeyDown(KeyCode.R) || (hint.gameObject.activeSelf && Input.GetMouseButtonDown(0)))
             {
+                BattleShow.Reset();
                 ui = null;
                 StartCoroutine(Load());
                 return;
@@ -316,6 +334,11 @@ namespace Automatic.Game
             // (Layout B: the board moves up above the tray while the shop opens.)
             var prep = Vector3.Lerp(prepPos, prepOpenPos, phone?.ShopButton != null ? ui.TrayOpen : 0);
             cam.transform.position = Vector3.Lerp(prep, battlePos, HuShowUi.Smooth(Mathf.InverseLerp(HuShowUi.MoveStart, HuShowUi.MoveEnd, t)));
+            if (t >= BattleAt)
+            {
+                battle.Tick(t - BattleAt);
+                cam.transform.position += battle.CameraOffset(cam.transform.position);
+            }
             for (var i = 0; i < enemies.Count; i++)
             {
                 var e = enemies[i];

@@ -110,3 +110,15 @@ Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZhe
 
 - **从概念图到 Unity 里卡通着色、带 6 个动作的角色，全程脚本化，可重跑**：图生 3D 约 3 分钟，绑定 + 动作 + 导出约 1 分钟，花费 30 积分（$0.30）。
 - 人工部分：关节位置测量、动作函数编写。下一个四足角色可以复用骨骼结构和动作函数，只改关节表。
+
+## 2026-10-07 战斗用动作
+
+- 为战斗演出切片（`art/fx/README.md` §4）新增了 `leap` 扑跃动作。攻击、施法、受击、死亡加大了幅度，加上预备动作和过冲。现在共 7 个动作。
+- 修正了一个旧错误：`hips` 绕 +Y 转是整个身体低头。原来施法时写的「后坐」，实际效果是低头。
+- 侧视检查图：`tools/art/blender/anim_sheet.py`，每个动作截 8 帧，直接从 .blend 渲染，不经过 Unity。
+
+```bash
+"$B" -b --python tools/art/blender/anim_sheet.py -- $M/zheng_anim.blend <out_dir> [clip ...]
+```
+
+- Unity 里的 Animator Controller 由 `BoardSlice.Controller` 自动补齐新动作的状态，在 `Batch.FxSlice` 里执行，不用重建棋盘场景。

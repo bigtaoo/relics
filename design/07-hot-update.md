@@ -73,6 +73,13 @@ YooAsset 的默认设置有两处会卡死玩家，原来的壳也没有重试�
 
 应对：壳里预先引用常用的泛型组合（`List<FP>`、`Dictionary<int, T>` 等）；每次出大版本都审查一遍 AOT 泛型清单。
 
+- **热更代码用到了壳里被裁掉的引擎 API**（2026-10-07 实测踩到）。
+  - IL2CPP 打壳时会裁掉没人引用的引擎代码。HybridCLR 生成的 link.xml 只保留打壳那一刻热更 dll 引用到的部分。
+  - 战斗切片的热更代码第一次调用 `MaterialPropertyBlock.SetColor`，旧壳里没有这个方法，运行时报 `MissingMethodException`。
+  - 应对：`client/Assets/Boot/link.xml` 整体保留热更代码可能用到的引擎模块，包括 Core、Animation、ParticleSystem、Physics、Audio、UI、TextRendering 和 InputLegacy。
+  - 代价：Windows 包的 `GameAssembly.dll` 从 45.1 MB 增加到 50.7 MB（+5.6 MB）。手机包的增量还要实测。
+  - 以后热更代码要用这些模块之外的引擎模块（如 AI、Video），要先在壳里加上，否则只能等下一个壳。
+
 ## 5. 与确定性战斗核心的关系（本项目特有）
 
 Battle.Core 在热更层，所以**客户端与服务端的核心版本可能不一致**，必须明确处理：
