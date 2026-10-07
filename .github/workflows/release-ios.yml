@@ -1,0 +1,168 @@
+name: iOS - Build & Release
+
+# design/09 §2: Unity exports the Xcode project on ubuntu (GameCI), macOS compiles, signs and uploads.
+# Trigger: push a tag `ios-v*`, or run manually. destination `none` only compiles (no signing, no
+# upload), the check a Windows dev machine cannot do; it needs only the Unity secrets.
+#
+# Repo secrets (Settings -> Secrets and variables -> Actions):
+#   UNITY_EMAIL, UNITY_PASSWORD     Unity account of the Personal license (GameCI activation)
+#   UNITY_LICENSE                   contents of Unity_lic.ulf, if the Hub wrote one (GameCI docs)
+#   APPLE_TEAM_ID                   10-char Team ID
+#   BUILD_CERTIFICATE_BASE64        Apple Distribution cert (.p12) base64; P12_PASSWORD its password
+#   KEYCHAIN_PASSWORD               any string; temp keychain password on the runner
+#   ASC_API_KEY_ID, ASC_API_ISSUER_ID, ASC_API_KEY_CONTENT_BASE64 (.p8 base64)
+#     App Store Connect API key (Admin or App Manager): xcodebuild signs automatically with it,
+#     registering the bundle id and creating the provisioning profile itself.
+# The app record must exist in App Store Connect before the first upload.
+
+on:
+  push:
+    tags:
+      - 'ios-v*'
+  workflow_dispatch:
+    inputs:
+      destination:
+        description: 'Upload destination (none = compile check only, unsigned)'
+        required: true
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - testflight
+
+env:
+  # Shell version <X.Y>.<build> with build = run number (design/09 §3); X.Y matches ProjectSetup.
+  MARKETING_VERSION: '0.1'
+  SIGN: ${{ github.event_name == 'push' || inputs.destination != 'none' }}
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@v1.3.1
+        with:
+          android: true
+          dotnet: false
+          large-packages: false
+
+      - name: Checkout
+        uses: actions/checkout@v5
+        with:
+          lfs: true
+
+      - name: Cache Library
+        uses: actions/cache@v4
+        with:
+          path: client/Library
+          key: library-ios-${{ hashFiles('client/Packages/packages-lock.json') }}
+          restore-keys: library-ios-
+
+      # Installs HybridCLR, generates its AOT data, builds the resource package and the player
+      # (PlayerBuild.Build). Output: artifacts/player/iOS/Xcode and the matching artifacts/cdn/iOS.
+      - name: Export Xcode project
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+        with:
+          projectPath: client
+          targetPlatform: iOS
+          unityVersion: 6000.3.25f1
+          buildMethod: Automatic.Editor.Batch.CiBuildPlayer
+          customParameters: >-
+            -shellVersion ${{ env.MARKETING_VERSION }}.${{ github.run_number }}
+            -buildNumber ${{ github.run_number }}
+            ${{ env.SIGN == 'true' && format('-appleTeam {0}', secrets.APPLE_TEAM_ID) || '' }}
+
+      # One archive: the Xcode project has tens of thousands of files.
+      - name: Pack
+        run: |
+          sudo tar -C artifacts/player/iOS -czf xcode.tgz Xcode
+          sudo tar -C artifacts/cdn -czf cdn-ios.tgz iOS
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: xcode
+          path: xcode.tgz
+          retention-days: 3
+
+      # The resource versions this shell was built with: unpack into artifacts/cdn on the dev PC so
+      # the phone's CDN (tools/bench/phone_cdn.py) serves what the shell expects.
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cdn-ios
+          path: cdn-ios.tgz
+
+  build:
+    needs: export
+    runs-on: macos-26
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: xcode
+
+      - name: Unpack
+        run: tar -xzf xcode.tgz
+
+      - name: Compile check (unsigned)
+        if: env.SIGN != 'true'
+        working-directory: Xcode
+        run: |
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+            -sdk iphoneos -destination generic/platform=iOS build CODE_SIGNING_ALLOWED=NO | tail -50
+          exit ${PIPESTATUS[0]}
+
+      - name: Import signing certificate
+        if: env.SIGN == 'true'
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.BUILD_CERTIFICATE_BASE64 }}
+          p12-password: ${{ secrets.P12_PASSWORD }}
+          keychain-password: ${{ secrets.KEYCHAIN_PASSWORD }}
+
+      - name: Archive and export IPA
+        if: env.SIGN == 'true'
+        working-directory: Xcode
+        run: |
+          KEY=$RUNNER_TEMP/AuthKey.p8
+          echo -n "${{ secrets.ASC_API_KEY_CONTENT_BASE64 }}" | base64 --decode > $KEY
+          AUTH="-allowProvisioningUpdates -authenticationKeyPath $KEY -authenticationKeyID ${{ secrets.ASC_API_KEY_ID }} -authenticationKeyIssuerID ${{ secrets.ASC_API_ISSUER_ID }}"
+          cat > $RUNNER_TEMP/ExportOptions.plist << EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>app-store-connect</string>
+              <key>teamID</key>
+              <string>${{ secrets.APPLE_TEAM_ID }}</string>
+              <key>signingStyle</key>
+              <string>automatic</string>
+              <key>uploadSymbols</key>
+              <true/>
+          </dict>
+          </plist>
+          EOF
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+            -destination generic/platform=iOS -archivePath $RUNNER_TEMP/Relics.xcarchive archive \
+            CODE_SIGN_STYLE=Automatic DEVELOPMENT_TEAM=${{ secrets.APPLE_TEAM_ID }} $AUTH | tail -50
+          test ${PIPESTATUS[0]} -eq 0
+          xcodebuild -exportArchive -archivePath $RUNNER_TEMP/Relics.xcarchive \
+            -exportOptionsPlist $RUNNER_TEMP/ExportOptions.plist -exportPath $RUNNER_TEMP/ipa $AUTH
+
+      - name: Upload IPA artifact
+        if: env.SIGN == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: Relics.ipa
+          path: ${{ runner.temp }}/ipa/*.ipa
+
+      - name: Upload to App Store Connect
+        if: env.SIGN == 'true'
+        run: |
+          mkdir -p ~/private_keys
+          echo -n "${{ secrets.ASC_API_KEY_CONTENT_BASE64 }}" | base64 --decode > ~/private_keys/AuthKey_${{ secrets.ASC_API_KEY_ID }}.p8
+          xcrun altool --upload-app --type ios --file "$(ls $RUNNER_TEMP/ipa/*.ipa)" \
+            --apiKey "${{ secrets.ASC_API_KEY_ID }}" --apiIssuer "${{ secrets.ASC_API_ISSUER_ID }}"

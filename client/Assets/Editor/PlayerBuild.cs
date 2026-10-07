@@ -22,6 +22,7 @@ namespace Automatic.Editor
 
         public static void Build(BuildTarget target)
         {
+            BakeCiVersion();
             // Generates link.xml, bridge functions and the stripped AOT dlls used as metadata.
             PrebuildCommand.GenerateAll();
             var version = HotUpdateBuild.Build(target, HotUpdateBuild.NextVersion(target), YooAsset.Editor.EBundledCopyOption.ClearAndCopyAll, newShell: true);
@@ -50,6 +51,36 @@ namespace Automatic.Editor
                 PlayerSettings.insecureHttpOption = http;
             }
             Debug.Log($"[Player] {target} shell {PlayerSettings.bundleVersion}, resources {version}, {(release ? "release" : "development")} -> {dir}");
+        }
+
+        /// <summary>
+        /// CI bakes the shell version and build number into the player (design/09 §3): a shell left
+        /// at the project's version would look like a dev build. `-shellVersion X.Y.N -buildNumber N`;
+        /// `-appleTeam ID` turns on automatic signing for that team (the workflow signs with it).
+        /// </summary>
+        private static void BakeCiVersion()
+        {
+            var shell = Arg("-shellVersion");
+            if (shell != null) PlayerSettings.bundleVersion = shell;
+            var build = Arg("-buildNumber");
+            if (build != null)
+            {
+                PlayerSettings.iOS.buildNumber = build;
+                PlayerSettings.Android.bundleVersionCode = int.Parse(build);
+            }
+            var team = Arg("-appleTeam");
+            if (team != null)
+            {
+                PlayerSettings.iOS.appleDeveloperTeamID = team;
+                PlayerSettings.iOS.appleEnableAutomaticSigning = true;
+            }
+        }
+
+        private static string Arg(string name)
+        {
+            var args = System.Environment.GetCommandLineArgs();
+            var i = System.Array.IndexOf(args, name);
+            return i >= 0 && i + 1 < args.Length ? args[i + 1] : null;
         }
 
         private static string PlayerFileName(BuildTarget target)

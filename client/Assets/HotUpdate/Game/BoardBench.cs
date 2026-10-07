@@ -129,7 +129,7 @@ namespace Automatic.Game
             Debug.Log("[Bench] memory MB: " + string.Join(", ", MemoryCounters.Select((n, i) =>
                 $"{n} {(memory[i].Valid ? (memory[i].LastValue / 1048576.0).ToString("F1") : "n/a")}")));
             foreach (var r in render.Concat(memory)) r.Dispose();
-            Application.Quit();
+            BenchReport.Finish();
         }
 
         private static string Tail(List<double> v, int n) => v.Count > 0 ? $"{v.Skip(Mathf.Max(0, v.Count - n)).Average():F2} ms" : "n/a";

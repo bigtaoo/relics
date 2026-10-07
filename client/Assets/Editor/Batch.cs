@@ -12,7 +12,20 @@ namespace Automatic.Editor
     /// </summary>
     public static class Batch
     {
-        public static void InstallHybridClr() => Run(() =>
+        public static void InstallHybridClr() => Run(InstallHybridClrOnce);
+
+        public static void Setup() => Run(ProjectSetup.Run);
+
+        public static void BuildPlayer() => Run(() => PlayerBuild.Build(EditorUserBuildSettings.activeBuildTarget));
+
+        /// <summary>CI runners start clean (.github/workflows/release-ios.yml): HybridCLR first, then the player.</summary>
+        public static void CiBuildPlayer() => Run(() =>
+        {
+            InstallHybridClrOnce();
+            PlayerBuild.Build(EditorUserBuildSettings.activeBuildTarget);
+        });
+
+        private static void InstallHybridClrOnce()
         {
             var c = new InstallerController();
             if (c.HasInstalledHybridCLR() && c.InstalledLibil2cppVersion == c.PackageVersion)
@@ -23,11 +36,7 @@ namespace Automatic.Editor
             c.InstallDefaultHybridCLR();
             if (!c.HasInstalledHybridCLR())
                 throw new Exception("HybridCLR install failed, see log above.");
-        });
-
-        public static void Setup() => Run(ProjectSetup.Run);
-
-        public static void BuildPlayer() => Run(() => PlayerBuild.Build(EditorUserBuildSettings.activeBuildTarget));
+        }
 
         public static void BuildHotUpdate() => Run(() =>
         {

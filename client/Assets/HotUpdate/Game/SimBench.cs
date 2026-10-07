@@ -72,7 +72,7 @@ namespace Automatic.Game
                           $"worst tick {worstTick:F2} ms, hash {hash:x16} {(hash == golden ? "PASS" : $"FAIL (expected {golden:x16})")}");
             }
             Debug.Log("[SimBench] done");
-            Application.Quit();
+            BenchReport.Finish();
         }
 
         private static SimConfig Make(string name, uint seed) =>

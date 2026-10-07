@@ -28,6 +28,24 @@ macOS runner 分钟数更贵，所以 Unity 的耗时步骤放在 ubuntu 上。H
 
 手动触发保留 funny 的 `destination: none` 选项：只编译不上传。用来回答「原生层还能不能编译」这个 Windows 开发机回答不了的问题，又不白白消耗 build 号。
 
+### iOS 现状（2026-10-07）
+
+`.github/workflows/release-ios.yml` 已写好，还没跑过：缺 Unity 授权和 Apple 签名的 Secrets（§5）。
+
+- **Windows 上已验证的部分**：装了 iOS 模块后，`BuildPlayer -buildTarget iOS` 能导出 Xcode 工程（1.3 GB），同一份工程就是 CI 第一段的产物。
+  - HybridCLR 的 libil2cpp 源码在导出的工程里，由 Xcode 编译，不需要另外打 libil2cpp.a。
+  - 热更构建的 API 检查在 iOS 上同样生效。第一次导出就拦下了热更代码新用到、但壳里被裁掉的 `UploadHandlerRaw`（已加进 link.xml）。
+- **CI 第一段**：GameCI 的 `unityci/editor:ubuntu-6000.3.25f1-ios-3` 镜像，入口是 `Batch.CiBuildPlayer`，先装 HybridCLR，再走 `PlayerBuild`。通过 `-shellVersion 0.1.<run> -buildNumber <run>` 把壳的版本烘焙进包（§3 的护栏）。产物有两份：Xcode 工程，以及这个壳对应的 `cdn/iOS` 资源。
+- **CI 第二段**：
+  - `none`：不签名，只编译（`CODE_SIGNING_ALLOWED=NO`），只要 Unity 的 Secrets 就能跑。
+  - `testflight`：用 ASC API Key 自动签名（`-allowProvisioningUpdates`），Xcode 自己注册 Bundle ID、生成描述文件，所以不用像 funny 那样手动存描述文件。签名证书还是要导入。
+- **Unity 授权有风险**：GameCI 的个人版激活文档要 `Unity_lic.ulf`，但 Unity 6 的个人版是 entitlement 授权，本机只有 `UnityEntitlementLicense.xml`，没有 `.ulf`。先只配邮箱和密码试一次；不行的话，改为在本机导出 Xcode 工程，传给 macOS 那一段（用草稿 Release 中转，不公开），只有签名和编译在 CI 上做。
+- **不用 Mac 跑真机测试**：iOS 没有启动参数，也没有 adb。
+  - 启动方式：用链接 `relics://run?cdn=...&name=...&args=...` 启动应用（URL Scheme）。壳从链接里读 CDN 地址并记住，热更层从链接里读压测参数（`LaunchArgs`）。
+  - 测试页：电脑上运行 `tools/bench/phone_cdn.py`，它代替 `http.server` 提供 CDN，还提供一个测试页 `/ios`，每个测试一个链接。在 iPhone 的 Safari 里打开测试页，点链接即可。
+  - 结果回传：压测结束后，结果行通过 POST 传回电脑（`BenchReport`），存在 `artifacts/bench/ios/`，同时留在屏幕上，不退出应用。
+  - 准备工作：iPhone 和电脑要在同一个 Wi-Fi；Windows 第一次会询问是否允许 Python 接受专用网络连接，要选允许；iOS 第一次会询问是否允许访问本地网络，也要允许。
+
 ## 3. 版本号（沿用 funny §11.3 的版本线）
 
 | 产物 | 版本 | 例 |
@@ -63,8 +81,8 @@ macOS runner 分钟数更贵，所以 Unity 的耗时步骤放在 ubuntu 上。H
 
 ## 5. 待办
 
-- [ ] 确定 Bundle ID / Steam App ID / Android 包名（上架后不可改）
-- [ ] Apple：新建 App ID 和 ASC 记录，签名材料存进本仓库的 Secrets
+- [ ] 确定 Bundle ID / Steam App ID / Android 包名（上架后不可改）。现在用的是占位的 `com.bigtaoo.Relics`
+- [ ] Apple：在 App Store Connect 新建 App 记录（Bundle ID 由 CI 自动注册）。把 funny 的签名证书、Team ID、ASC API Key 存进本仓库的 Secrets（Secrets 的值不能跨仓库复制，要重新填）。名单见 `release-ios.yml` 文件头
 - [ ] Steam：注册 App（Steam Direct 费用），建 depot 和 beta 分支
-- [ ] Unity 授权接入 CI
+- [ ] Unity 授权接入 CI：配 `UNITY_EMAIL` / `UNITY_PASSWORD`，先跑一次 `destination: none`
 - [ ] 07 §7 热更最小验证在 TestFlight 真机上跑通

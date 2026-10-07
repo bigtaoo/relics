@@ -16,6 +16,10 @@
   <assembly fullname="UnityEngine.UIModule" preserve="all" />
   <assembly fullname="UnityEngine.TextRenderingModule" preserve="all" />
   <assembly fullname="UnityEngine.InputLegacyModule" preserve="all" />
+  <!-- The shell only downloads (YooAsset); hot code also posts (BenchReport, later the game's own requests). -->
+  <assembly fullname="UnityEngine.UnityWebRequestModule" preserve="all" />
+  <!-- The shell's boot screen uses a few GUI calls; hot debug screens (HotHud) use more of IMGUI. -->
+  <assembly fullname="UnityEngine.IMGUIModule" preserve="all" />
   <!--
     The battle core is shell code (ADR-010) but only hot code calls it: without this IL2CPP strips
     whatever the hot code of the moment does not reference, and the next hot update could not use it.

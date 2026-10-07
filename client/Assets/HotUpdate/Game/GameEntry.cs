@@ -18,6 +18,7 @@ namespace Automatic.Game
         public static void Start()
         {
             var package = YooAssets.GetPackage(PackageName);
+            BenchReport.Listen();
             if (SimBench.Requested())
             {
                 SimBench.Run();

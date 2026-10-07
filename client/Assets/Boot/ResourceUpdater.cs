@@ -103,7 +103,7 @@ namespace Automatic.Boot
                 }
                 default:
                 {
-                    var cdn = $"{BootConfig.LocalCdnRoot}/{BootConfig.PlatformFolder}";
+                    var cdn = $"{BootConfig.CdnRoot}/{BootConfig.PlatformFolder}";
                     var options = new HostPlayModeOptions();
                     options.BuiltinFileSystemParameters = FileSystemParameters.CreateDefaultBuiltinFileSystemParameters();
                     options.BuiltinFileSystemParameters.AddParameter(EFileSystemParameter.CopyBuiltinPackageManifest, true);

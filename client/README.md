@@ -104,6 +104,16 @@ status. `tools/bench/android.sh [--install] suite|soak|sim` installs `artifacts/
 sets up `adb reverse tcp:8000 tcp:8000` for the local CDN, runs the cases and keeps the `[Bench]`
 lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`ProjectSetup`).
 
+iOS has neither a command line nor adb. There the switches come from the link that opened the app,
+`relics://run?cdn=http://<pc>:8000&name=vat254&args=-bench+-crowd+254+-vat`. The shell keeps the
+`cdn` (`BootConfig.CdnRoot`), and `BenchReport` posts the `[Bench]` lines to `<cdn>/bench/<name>`
+and leaves them on screen instead of quitting. `python tools/bench/phone_cdn.py` serves the CDN in place
+of `http.server`, keeps the posted results in `artifacts/bench/ios/`, and prints the address of a page
+(`/ios`) with one link per case: open it in Safari on the phone, which must be on the same Wi-Fi.
+The Xcode project comes from `BuildPlayer -buildTarget iOS` (needs the iOS module, exports to
+`artifacts/player/iOS/Xcode`); signing and TestFlight run on CI (`.github/workflows/release-ios.yml`,
+design/09 §2). Before serving a CI-built shell, unpack the run's `cdn-ios` artifact into `artifacts/cdn`.
+
 Battle logic test (design/10): `-simbench [-seeds N]` runs the `CrowdBattle` stress prototype of
 Battle.Core (8v8, summon build, 300 units), IL2CPP native since the core is in the shell, and logs `[SimBench]`
 lines with the time per battle, the worst tick and the end hash against the golden values, then
