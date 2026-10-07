@@ -44,7 +44,7 @@
   - `none`：不签名，只编译（`CODE_SIGNING_ALLOWED=NO`），只要 Unity 的 Secrets 就能跑。
   - `testflight`：手动签名，用证书和描述文件，跟 funny 一样。
     - 之前打算用 ASC API Key 自动签名，没用，因为没有项目跑通过。
-    - Unity 工程有个坑：描述文件只能给 `Unity-iPhone` 这个 target，`UnityFramework` 不能带描述文件。所以不能像 funny 那样在 xcodebuild 命令行上传 `PROVISIONING_PROFILE_SPECIFIER`，因为它会作用到所有 target。workflow 用 ruby 的 `xcodeproj` 分别给两个 target 改签名设置。这是 SumQuest-OLD 连续 exit 65 之后找到的解法。
+    - Unity 工程有个坑：描述文件只能给 `Unity-iPhone` 这个 target，`UnityFramework` 不能带描述文件。所以不能像 funny 那样在 xcodebuild 命令行上传 `PROVISIONING_PROFILE_SPECIFIER`，因为它会作用到所有 target。workflow 用 ruby 的 `xcodeproj` 分别给两个 target 改签名设置。这是 SumQuest-OLD 连续 exit 65 之后找到的解法。已在本机用 Docker 里的 Ruby 对导出的工程跑过这段脚本：`Unity-iPhone` 的 4 个配置都是 Manual 并带上了描述文件，`UnityFramework` 是 Manual、不带描述文件，读出的 Bundle ID 是 `com.gamestao.relics`。
 - **Unity 授权**：只配邮箱和密码不行。SumQuest-OLD 2026-03-16 第一次运行就报 `Missing Unity License File and no Serial was found`；加上 `UNITY_LICENSE`（`Unity_lic.ulf` 文件的内容）之后，Unity 那一步就过了，同样是 Unity 6000.3 个人版。
   - 本机现在没有 `.ulf`，只有 `UnityEntitlementLicense.xml`。当时那个 `.ulf` 从哪来、还在不在，要问用户。
   - 备选：在本机导出 Xcode 工程，CI 只做签名和编译。
