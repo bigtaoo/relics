@@ -1,0 +1,63 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: zheng_pottery
+  m_Shader: {fileID: 4800000, guid: 955dc9b5d89a7f744bad3002d3c7df02, type: 3}
+  m_Parent: {fileID: 0}
+  m_ModifiedSerializedProperties: 0
+  m_ValidKeywords:
+  - _VAT
+  m_InvalidKeywords: []
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 1
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_LockedProperties: 
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _BaseMap:
+        m_Texture: {fileID: 2800000, guid: aaae11bde2d5dcd4b83f6ec4480e1364, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _VatNrm:
+        m_Texture: {fileID: 2800000, guid: aac7aca00e43f3144a108241ef882ab5, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _VatPos:
+        m_Texture: {fileID: 2800000, guid: a9fbd35bbf9474949b5e83daa12db6e0, type: 2}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _OutlineWidth: 0.006
+    - _Recolor: 1
+    - _RimPower: 4
+    - _RimStrength: 0.15
+    - _ShadeSoftness: 0.04
+    - _ShadeThreshold: 0.05
+    - _SpecSize: 0.08
+    - _TailGlow: 0
+    - _Vat: 1
+    - _VatFps: 30
+    m_Colors:
+    - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
+    - _BodyColor: {r: 0.6, g: 0.59, b: 0.56, a: 1}
+    - _HornColor: {r: 0.72, g: 0.7, b: 0.66, a: 1}
+    - _OutlineColor: {r: 0.13, g: 0.09, b: 0.05, a: 1}
+    - _RimColor: {r: 1, g: 0.92, b: 0.7, a: 1}
+    - _ShadeColor: {r: 0.55, g: 0.54, b: 0.62, a: 1}
+    - _SpecColor: {r: 0, g: 0, b: 0, a: 1}
+    - _SpotColor: {r: 0.33, g: 0.32, b: 0.31, a: 1}
+    - _TailRootColor: {r: 0.6, g: 0.59, b: 0.56, a: 1}
+    - _TailTipColor: {r: 0.6, g: 0.59, b: 0.56, a: 1}
+  m_BuildTextureStacks: []
+  m_AllowLocking: 1

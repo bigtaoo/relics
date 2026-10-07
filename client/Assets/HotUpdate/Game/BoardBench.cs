@@ -12,7 +12,8 @@ namespace Automatic.Game
     /// line switch, loads the board scene from the resource package, runs uncapped for a fixed
     /// time and logs "[Bench]" lines (frame times, GPU time, render counters, memory), then quits.
     /// -nosrpbatch turns the SRP Batcher off, to check that it is actually batching; -nooutline
-    /// turns the toon outline pass off.
+    /// turns the toon outline pass off; -crowd N adds summons and -fx K effects (CrowdBench);
+    /// -shot dir saves one screenshot after the warmup (raw RGB24 like ShopDemo -autoplay).
     /// </summary>
     public sealed class BoardBench : MonoBehaviour
     {
@@ -51,17 +52,33 @@ namespace Automatic.Game
             Debug.Log($"[Bench] scene {Scene} {load.Status}, screen {Screen.width}x{Screen.height}, {SystemInfo.graphicsDeviceName}, {SystemInfo.processorType}, " +
                       $"SRP Batcher {UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching}, development {Debug.isDebugBuild}");
 
+            var crowd = CrowdBench.Requested() > 0 ? CrowdBench.Create(package, CrowdBench.Requested()) : null;
+            if (crowd != null) Debug.Log("[Bench] crowd: " + crowd.Describe());
+
             if (System.Environment.GetCommandLineArgs().Contains("-nooutline"))
                 foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
                 foreach (var m in r.sharedMaterials)
                     if (m != null && m.shader.name == "Relics/Toon") m.SetShaderPassEnabled("Outline", false);
 
             yield return new WaitForSecondsRealtime(Warmup);
+            var shot = ShopDemo.ArgAfter("-shot");
+            if (shot != null)
+            {
+                yield return new WaitForEndOfFrame();
+                var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
+                tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
+                System.IO.Directory.CreateDirectory(shot);
+                System.IO.File.WriteAllBytes(System.IO.Path.Combine(shot, $"bench_{Screen.width}x{Screen.height}.rgb"), tex.GetRawTextureData());
+                Destroy(tex);
+            }
+            crowd?.ResetStats();
             var render = RenderCounters.Select(n => ProfilerRecorder.StartNew(ProfilerCategory.Render, n)).ToArray();
             var renderSamples = RenderCounters.Select(_ => new List<long>()).ToArray();
             var memory = MemoryCounters.Select(n => ProfilerRecorder.StartNew(ProfilerCategory.Memory, n)).ToArray();
             var frames = new List<float>();
             var gpu = new List<double>();
+            var main = new List<double>();
+            var renderThread = new List<double>();
             var timings = new FrameTiming[1];
             var end = Time.realtimeSinceStartup + Duration;
             while (Time.realtimeSinceStartup < end)
@@ -72,14 +89,20 @@ namespace Automatic.Game
                 // keep every frame and report the median.
                 for (var i = 0; i < render.Length; i++) renderSamples[i].Add(render[i].LastValue);
                 FrameTimingManager.CaptureFrameTimings();
-                if (FrameTimingManager.GetLatestTimings(1, timings) > 0 && timings[0].gpuFrameTime > 0)
-                    gpu.Add(timings[0].gpuFrameTime);
+                if (FrameTimingManager.GetLatestTimings(1, timings) > 0)
+                {
+                    if (timings[0].gpuFrameTime > 0) gpu.Add(timings[0].gpuFrameTime);
+                    if (timings[0].cpuMainThreadFrameTime > 0) main.Add(timings[0].cpuMainThreadFrameTime);
+                    if (timings[0].cpuRenderThreadFrameTime > 0) renderThread.Add(timings[0].cpuRenderThreadFrameTime);
+                }
             }
 
             frames.Sort();
             var avg = frames.Average();
             Debug.Log($"[Bench] frames {frames.Count}, avg {avg:F2} ms ({1000 / avg:F0} fps), median {frames[frames.Count / 2]:F2} ms, p99 {frames[(int)(frames.Count * 0.99f)]:F2} ms");
-            Debug.Log(gpu.Count > 0 ? $"[Bench] gpu avg {gpu.Average():F2} ms" : "[Bench] gpu time unavailable");
+            string Avg(List<double> v) => v.Count > 0 ? $"{v.Average():F2} ms" : "n/a";
+            Debug.Log($"[Bench] gpu avg {Avg(gpu)}, cpu main thread avg {Avg(main)}, render thread avg {Avg(renderThread)}");
+            if (crowd != null) Debug.Log("[Bench] crowd: " + crowd.Describe() + ", " + crowd.Particles());
             Debug.Log("[Bench] render median (min-max): " + string.Join(", ", RenderCounters.Select((n, i) =>
             {
                 var v = renderSamples[i].OrderBy(x => x).ToList();

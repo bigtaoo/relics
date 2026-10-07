@@ -43,6 +43,8 @@ namespace Automatic.Editor
 
         public static void UiSlice() => Run(Automatic.Editor.UiSlice.Build);
 
+        public static void CrowdBake() => Run(Automatic.Editor.CrowdBake.Build);
+
         private static void Run(Action action)
         {
             try

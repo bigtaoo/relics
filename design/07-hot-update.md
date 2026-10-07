@@ -79,6 +79,12 @@ YooAsset 的默认设置有两处会卡死玩家，原来的壳也没有重试�
   - 应对：`client/Assets/Boot/link.xml` 整体保留热更代码可能用到的引擎模块，包括 Core、Animation、ParticleSystem、Physics、Audio、UI、TextRendering 和 InputLegacy。
   - 代价：Windows 包的 `GameAssembly.dll` 从 45.1 MB 增加到 50.7 MB（+5.6 MB）。手机包的增量还要实测。
   - 以后热更代码要用这些模块之外的引擎模块（如 AI、Video），要先在壳里加上，否则只能等下一个壳。
+  - 同一天又踩到 .NET 基础库的同类问题：召唤物压力测试用了 `System.Random.NextDouble`，壳里的 mscorlib 已经裁掉了它。基础库太大，不能整体保留。
+  - **现在构建热更包时会自动检查**（`HotUpdateBuild.CheckShellApi`）：
+    - 用 HybridCLR 的 `MissingMetadataChecker`，把热更 dll 引用的每个类型、方法、字段，和上次打壳裁剪后的 AOT dll 对一遍。
+    - 有缺的就报出具体是哪个方法，并拒绝发布。
+    - 检查器自带的版本漏查了全部基础库引用：Unity 编译的热更 dll 经由 netstandard 门面引用基础库，而它找不到这个门面，也不会加载门面转发到的 mscorlib。已补上门面，并预先加载基础库，修完后只报出 `NextDouble` 这一处真实问题。
+    - 前提：本机最后一次打的壳就是 CDN 上那个壳。以后改成 CI 打包时，要把每个已发布壳的裁剪后 AOT dll 存档，按目标壳检查。
 
 ## 5. 与确定性战斗核心的关系（本项目特有）
 

@@ -1,9 +1,12 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using Automatic.Boot;
 using HybridCLR.Editor;
 using HybridCLR.Editor.Commands;
+using HybridCLR.Editor.HotUpdate;
+using HybridCLR.Editor.Meta;
 using UnityEditor;
 using UnityEngine;
 using YooAsset.Editor;
@@ -28,6 +31,7 @@ namespace Automatic.Editor
         public static string Build(BuildTarget target, string version, EBundledCopyOption bundledCopy)
         {
             CompileDllCommand.CompileDll(target);
+            CheckShellApi(target);
             CopyDlls(SettingsUtil.GetHotUpdateDllsOutputDirByTarget(target), BootConfig.HotUpdateAssemblies);
             CopyDlls(SettingsUtil.GetAssembliesPostIl2CppStripDir(target), BootConfig.AotMetadataAssemblies);
             AssetDatabase.Refresh();
@@ -36,6 +40,40 @@ namespace Automatic.Editor
             Publish(output, CdnDir(target), version);
             Debug.Log($"[HotUpdate] {target} {version} published to {CdnDir(target)}");
             return version;
+        }
+
+        /// <summary>
+        /// Hot code can only call what the shipped shell kept: IL2CPP strips engine and BCL API the
+        /// shell's own code did not use, and calling it fails at run time with MissingMethodException
+        /// (design/07 §4). Checked against the stripped AOT dlls of the last player build for this
+        /// target, which is the shell on the CDN; a hot update that needs more needs a new shell.
+        /// </summary>
+        private static void CheckShellApi(BuildTarget target)
+        {
+            var stripped = SettingsUtil.GetAssembliesPostIl2CppStripDir(target);
+            if (!Directory.Exists(stripped))
+                throw new DirectoryNotFoundException($"{stripped} missing: run 'Automatic/3. Build Player' first.");
+            // Hot dlls reference the BCL through the netstandard facade; with the AOT profile's
+            // facade next to the stripped dlls its forwards resolve into the stripped mscorlib,
+            // otherwise every BCL reference would go unchecked.
+            var aotDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../Library/ShellApiCheck", target.ToString()));
+            if (Directory.Exists(aotDir)) Directory.Delete(aotDir, true);
+            Directory.CreateDirectory(aotDir);
+            foreach (var dll in Directory.GetFiles(stripped, "*.dll")) File.Copy(dll, Path.Combine(aotDir, Path.GetFileName(dll)));
+            var os = Application.platform switch { RuntimePlatform.OSXEditor => "macos", RuntimePlatform.LinuxEditor => "linux", _ => "win32" };
+            File.Copy(Path.Combine(EditorApplication.applicationContentsPath, $"MonoBleedingEdge/lib/mono/unityaot-{os}/Facades/netstandard.dll"),
+                Path.Combine(aotDir, "netstandard.dll"));
+
+            var checker = new MissingMetadataChecker(aotDir, BootConfig.HotUpdateAssemblies);
+            // It loads the facade without what the facade forwards to (only a dll that references
+            // mscorlib directly would load it), so load those first: no false "missing System.Object".
+            var cache = (AssemblyCache)typeof(MissingMetadataChecker).GetField("_assCache", BindingFlags.NonPublic | BindingFlags.Instance)!.GetValue(checker);
+            foreach (var bcl in new[] { "mscorlib", "System", "System.Core" }) cache.LoadModule(bcl);
+            var hotDir = SettingsUtil.GetHotUpdateDllsOutputDirByTarget(target);
+            var failed = BootConfig.HotUpdateAssemblies.Where(n => !checker.Check(Path.Combine(hotDir, n + ".dll"))).ToArray();
+            if (failed.Length > 0)
+                throw new Exception($"Hot code in {string.Join(", ", failed)} uses API the shell stripped (errors above). " +
+                                    "Avoid it, or add it to Assets/Boot/link.xml and ship a new shell.");
         }
 
         private static void CopyDlls(string sourceDir, string[] names)

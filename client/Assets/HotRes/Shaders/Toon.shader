@@ -4,6 +4,8 @@
 // texture only supplies shading detail and the patina mask (green over red), and colours come
 // from the material. Vertex colour carries body-part masks from tools/art/blender/rig_zheng.py:
 // R = position along the tail, G = tail, B = horn.
+// _VAT (crowd units, design/08 §2): no skinning; each vertex reads its baked position and normal
+// from vertex animation textures (CrowdBake), per instance clip from _Clip, drawn instanced.
 Shader "Relics/Toon"
 {
     Properties
@@ -28,6 +30,11 @@ Shader "Relics/Toon"
         _RimStrength ("Rim Strength", Range(0, 1)) = 0.35
         _OutlineColor ("Outline Color", Color) = (0.13, 0.09, 0.05, 1)
         _OutlineWidth ("Outline Width", Range(0, 0.03)) = 0.006
+        [Header(Crowd)]
+        [Toggle(_VAT)] _Vat ("Vertex Animation Texture", Float) = 0
+        [NoScaleOffset] _VatPos ("VAT Positions", 2D) = "black" {}
+        [NoScaleOffset] _VatNrm ("VAT Normals", 2D) = "black" {}
+        _VatFps ("VAT Frames Per Second", Float) = 30
     }
     SubShader
     {
@@ -56,9 +63,32 @@ Shader "Relics/Toon"
             half _RimStrength;
             half4 _OutlineColor;
             float _OutlineWidth;
+            float _VatFps;
         CBUFFER_END
         TEXTURE2D(_BaseMap);
         SAMPLER(sampler_BaseMap);
+        TEXTURE2D(_VatPos);
+        TEXTURE2D(_VatNrm);
+
+        // x first row of the clip, y its frame count, z start time (_Time.y), w 1 = loop, 0 = hold the last frame.
+        UNITY_INSTANCING_BUFFER_START(Crowd)
+            UNITY_DEFINE_INSTANCED_PROP(float4, _Clip)
+        UNITY_INSTANCING_BUFFER_END(Crowd)
+
+        // Replaces the mesh's own position and normal with the baked frame, blended to the next one.
+        void Crowd(uint id, inout float3 position, inout float3 normal)
+        {
+        #if defined(_VAT)
+            float4 clip = UNITY_ACCESS_INSTANCED_PROP(Crowd, _Clip);
+            float f = max(0, (_Time.y - clip.z) * _VatFps);
+            f = clip.w > 0 ? fmod(f, clip.y) : min(f, clip.y - 1);
+            float f0 = floor(f);
+            float f1 = clip.w > 0 ? fmod(f0 + 1, clip.y) : min(f0 + 1, clip.y - 1);
+            int2 a = int2(id, clip.x + f0), b = int2(id, clip.x + f1);
+            position = lerp(LOAD_TEXTURE2D_LOD(_VatPos, a, 0).xyz, LOAD_TEXTURE2D_LOD(_VatPos, b, 0).xyz, f - f0);
+            normal = lerp(LOAD_TEXTURE2D_LOD(_VatNrm, a, 0).xyz, LOAD_TEXTURE2D_LOD(_VatNrm, b, 0).xyz, f - f0);
+        #endif
+        }
         ENDHLSL
 
         Pass
@@ -68,14 +98,18 @@ Shader "Relics/Toon"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_instancing
+            #pragma shader_feature_local_vertex _VAT
             #pragma multi_compile _ _MAIN_LIGHT_SHADOWS _MAIN_LIGHT_SHADOWS_CASCADE
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; half4 color : COLOR; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; float2 uv : TEXCOORD0; half4 color : COLOR; uint id : SV_VertexID; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; float2 uv : TEXCOORD0; float3 normalWS : TEXCOORD1; float3 positionWS : TEXCOORD2; half4 parts : TEXCOORD3; };
 
             Varyings Vert(Attributes i)
             {
                 Varyings o;
+                UNITY_SETUP_INSTANCE_ID(i);
+                Crowd(i.id, i.positionOS.xyz, i.normalOS);
                 VertexPositionInputs p = GetVertexPositionInputs(i.positionOS.xyz);
                 o.positionCS = p.positionCS;
                 o.positionWS = p.positionWS;
@@ -125,13 +159,17 @@ Shader "Relics/Toon"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_instancing
+            #pragma shader_feature_local_vertex _VAT
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; uint id : SV_VertexID; UNITY_VERTEX_INPUT_INSTANCE_ID };
             struct Varyings { float4 positionCS : SV_POSITION; };
 
             Varyings Vert(Attributes i)
             {
                 Varyings o;
+                UNITY_SETUP_INSTANCE_ID(i);
+                Crowd(i.id, i.positionOS.xyz, i.normalOS);
                 o.positionCS = TransformObjectToHClip(i.positionOS.xyz + normalize(i.normalOS) * _OutlineWidth);
                 return o;
             }
@@ -152,14 +190,18 @@ Shader "Relics/Toon"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_instancing
+            #pragma shader_feature_local_vertex _VAT
 
             // Set by URP's shadow caster pass for the main (directional) light.
             float3 _LightDirection;
 
-            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; };
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; uint id : SV_VertexID; UNITY_VERTEX_INPUT_INSTANCE_ID };
 
             float4 Vert(Attributes i) : SV_POSITION
             {
+                UNITY_SETUP_INSTANCE_ID(i);
+                Crowd(i.id, i.positionOS.xyz, i.normalOS);
                 float3 positionWS = TransformObjectToWorld(i.positionOS.xyz);
                 float3 normalWS = TransformObjectToWorldNormal(i.normalOS);
                 float4 positionCS = TransformWorldToHClip(ApplyShadowBias(positionWS, normalWS, _LightDirection));
@@ -184,8 +226,17 @@ Shader "Relics/Toon"
             HLSLPROGRAM
             #pragma vertex Vert
             #pragma fragment Frag
+            #pragma multi_compile_instancing
+            #pragma shader_feature_local_vertex _VAT
 
-            float4 Vert(float4 positionOS : POSITION) : SV_POSITION { return TransformObjectToHClip(positionOS.xyz); }
+            struct Attributes { float4 positionOS : POSITION; float3 normalOS : NORMAL; uint id : SV_VertexID; UNITY_VERTEX_INPUT_INSTANCE_ID };
+
+            float4 Vert(Attributes i) : SV_POSITION
+            {
+                UNITY_SETUP_INSTANCE_ID(i);
+                Crowd(i.id, i.positionOS.xyz, i.normalOS);
+                return TransformObjectToHClip(i.positionOS.xyz);
+            }
             half4 Frag() : SV_Target { return 0; }
             ENDHLSL
         }

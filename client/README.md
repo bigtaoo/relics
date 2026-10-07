@@ -87,6 +87,20 @@ package, runs uncapped for 10 s and logs `[Bench]` lines (frame times, per-frame
 medians, memory), then quits. `-nosrpbatch` turns the SRP Batcher off and `-nooutline` the toon
 outline, to see what each costs.
 
+Crowd test (summon builds, ~300 units): `-bench -crowd 254` adds 254 low-poly summons
+(`zheng_lo.fbx`, from `tools/art/blender/lowpoly.py`) as Animator + SkinnedMeshRenderer units;
+`-vat` draws them instead from vertex animation textures with `Graphics.RenderMeshInstanced`;
+`-optimize` strips the skinned summons' bone GameObjects; `-fx K` keeps K pooled hit effects
+playing; `-shot dir` saves a raw RGB24 screenshot after the warmup. The VAT textures, mesh and
+materials (`Assets/HotRes/Art/Crowd/`) come from `Batch.CrowdBake`; rerun it after the low-poly
+model or its clips change. Instanced draws need materials with instancing on in the hot bundle,
+or the shader's instancing variant is not in it and nothing is drawn.
+
+`BuildHotUpdate` refuses to publish when hot code calls engine or BCL API that the last player
+build of that target stripped (`HotUpdateBuild.CheckShellApi`, design/07 §4): it would throw
+MissingMethodException in that shell. Avoid the API, or preserve it in `Assets/Boot/link.xml`
+and ship a new shell.
+
 The toon outline is drawn by the `Toon Outline` RenderObjects feature on `Assets/Settings/URP-Renderer.asset`
 (LightMode `Outline`, after opaques; added by `Setup`), not in the forward draw, which kept the SRP
 Batcher from batching. The renderer ships in the player: a shader change that relies on it needs a

@@ -27,12 +27,12 @@ namespace Automatic.Editor
     {
         internal const string ScenePath = "Assets/HotRes/Scenes/board_west.unity";
         internal const string ZhengDir = "Assets/HotRes/Art/Zheng/";
-        private const float Pitch = 50, Fov = 30;
+        // Units face the other side turned by Turn degrees, so the camera sees their profile:
+        // a quadruped seen straight from behind or in front reads as a blob.
+        internal const float Pitch = 50, Turn = 40;
+        private const float Fov = 30;
         private const float UnitLength = 0.85f, BenchScale = 0.8f;
         private const float PedestalHeight = 0.05f;
-        // Units face the other side turned by this much, so the camera sees their profile:
-        // a quadruped seen straight from behind or in front reads as a blob.
-        private const float Turn = 40;
 
         // Cost tiers weighted towards the cheap end, as a mid-game board would be.
         private static readonly string[] Tiers = { "pottery", "pottery", "pottery", "bronze", "bronze", "bronze", "jade", "jade", "gold" };
@@ -68,17 +68,7 @@ namespace Automatic.Editor
             var ringMesh = BoardDressing.SaveMesh("board_ring", Ring(0.4f, 0.5f));
             var pedestalMesh = BoardDressing.SaveMesh("board_pedestal", BoardDressing.Cylinder(32));
 
-            // Orientation and scale come from a probe: the model's front is where the horn is.
-            var probe = (GameObject)PrefabUtility.InstantiatePrefab(model);
-            clips["idle"].SampleAnimation(probe, 0);
-            var bounds = ArtPreview.Bounds(probe);
-            var horn = probe.GetComponentsInChildren<Transform>().First(t => t.name == "horn").position - bounds.center;
-            var facing = Quaternion.FromToRotation(new Vector3(horn.x, 0, horn.z).normalized, Vector3.forward);
-            var scale = UnitLength / Mathf.Max(bounds.size.x, bounds.size.z);
-            var height = bounds.size.y * scale;
-            var lift = -bounds.min.y * scale; // the model origin is not at its feet
-            Debug.Log($"[Board] model bounds {bounds.min} .. {bounds.max}, scale {scale:F3}");
-            Object.DestroyImmediate(probe);
+            var (facing, scale, height, lift) = Probe(model, clips["idle"]);
 
             var rng = new Random(7);
             var units = new GameObject("Units").transform;
@@ -139,6 +129,23 @@ namespace Automatic.Editor
             var stats = Stats(cam);
             File.WriteAllText(Path.Combine(outDir, "stats.txt"), stats);
             Debug.Log("[Board] " + stats.Replace("\n", " | "));
+        }
+
+        /// <summary>
+        /// Orientation and scale of a unit model, from a probe: the model's front is where the horn
+        /// is; Scale makes it UnitLength long, Height is then its height and Lift raises its feet to 0.
+        /// </summary>
+        internal static (Quaternion Facing, float Scale, float Height, float Lift) Probe(GameObject model, AnimationClip idle)
+        {
+            var probe = (GameObject)PrefabUtility.InstantiatePrefab(model);
+            idle.SampleAnimation(probe, 0);
+            var bounds = ArtPreview.Bounds(probe);
+            var horn = probe.GetComponentsInChildren<Transform>().First(t => t.name == "horn").position - bounds.center;
+            var facing = Quaternion.FromToRotation(new Vector3(horn.x, 0, horn.z).normalized, Vector3.forward);
+            var scale = UnitLength / Mathf.Max(bounds.size.x, bounds.size.z);
+            Debug.Log($"[Board] model bounds {bounds.min} .. {bounds.max}, scale {scale:F3}");
+            Object.DestroyImmediate(probe);
+            return (facing, scale, bounds.size.y * scale, -bounds.min.y * scale); // the model origin is not at its feet
         }
 
         /// <summary>Health bar facing the battle camera: dark back and a team-coloured fill.</summary>

@@ -122,3 +122,16 @@ Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZhe
 ```
 
 - Unity 里的 Animator Controller 由 `BoardSlice.Controller` 自动补齐新动作的状态，在 `Batch.FxSlice` 里执行，不用重建棋盘场景。
+
+## 2026-10-07 召唤物低模
+
+同屏 300 单位测试用（`art/board/README.md`「同屏 300 单位」）。`tools/art/blender/lowpoly.py` 读入带动作的 `zheng_anim.blend`，把蒙皮网格减到约 400 面，骨骼、权重、顶点色和全部动作保留，再用 `export_fbx.py` 导出 `zheng_lo.fbx`（导出时顺带写出的 `zheng_lo_basecolor.png` 删掉，材质继续共用 `zheng_basecolor.png`）。
+
+```
+blender -b --python tools/art/blender/lowpoly.py -- art/zheng/model/zheng_anim.blend artifacts/crowd/zheng_lo.blend 400
+blender -b --python tools/art/blender/export_fbx.py -- artifacts/crowd/zheng_lo.blend client/Assets/HotRes/Art/Zheng/zheng_lo.fbx
+```
+
+- 结果：3000 面减到 400 面，在 Unity 里是 605 个顶点（UV 接缝处顶点被拆开）。骨骼还是 39 根。
+- 减面修改器要先挪到修改器栈的第一位再应用。否则应用时会连同骨骼的当前姿势一起烘进网格。
+- 正式的召唤物会是另外的模型，骨骼应该更少。这里只是拿来测性能。
