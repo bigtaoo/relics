@@ -90,7 +90,7 @@
   - 建议把 Core 编进壳，要改 ADR-008，**待定**。详见 10。安卓用 `android.sh sim` 测。
 - 2026-10-07 **Core 编进壳**（ADR-010）：商业版 DHE 没有试用，先做免费的方案 A。热更层只剩 `Automatic.Game`；改 Core 代码要发新壳，热更构建会检查并拒绝。战法数据以后放单独的热更程序集（03 §7）。PC 开发版召唤流一场 3154 → 218 ms，哈希不变。手机到了要先重新打 APK。
 - 2026-10-07 **特效图集**：5 张遮罩合成一张图集，所有特效共用一个材质，亮度和不透明度改由粒子自定义数据传入。120 个特效同时播放时 SetPass 145 → 25，且不再随特效个数增长；PC 核显的 GPU 时间 3.4 → 1.8 ms，主线程不变，画面不变。只发了热更包。见 `art/fx/README.md` §5「图集」。
-- 2026-10-07 **iOS 构建**（为 iPhone 13 测试准备）：Windows 上已经能导出 iOS 的 Xcode 工程（HybridCLR 解释器源码在工程里，热更检查在 iOS 上也生效），GitHub Actions 流水线已写好。没有 Mac 也能在 iPhone 上跑压测：用 Safari 打开电脑上的测试页，点链接启动，结果自动传回电脑。还要你配 Unity 授权和 Apple 签名，见 09 §5。后来参照 SumQuest-OLD 跑通过的流水线改成了一个 macOS job，签名改为手动；Unity 授权必须有 `Unity_lic.ulf`（09 §2）。
+- 2026-10-07 **iOS 构建**（为 iPhone 13 测试准备）：Windows 上已经能导出 iOS 的 Xcode 工程（HybridCLR 解释器源码在工程里，热更检查在 iOS 上也生效），GitHub Actions 流水线已写好。没有 Mac 也能在 iPhone 上跑压测：用 Safari 打开电脑上的测试页，点链接启动，结果自动传回电脑。还要你配 Unity 授权和 Apple 签名，见 09 §5。后来参照 SumQuest-OLD 跑通过的流水线改成了一个 macOS job，签名改为手动；Unity 授权必须有 `Unity_lic.ulf`（09 §2）。Bundle ID 和安卓包名定为 `com.gamestao.relics`。签名脚本已在本机用 Docker 对导出的工程验证过。还在等你配 Secrets，见 09 §5。
 
 ## 3. UI：商店 + 听牌提示
 
