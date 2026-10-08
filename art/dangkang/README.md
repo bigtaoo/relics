@@ -4,6 +4,8 @@
 
 目的：验证 11 §7 的「出图从 Mistral 换到 Tripo」，以及「同家族第二只」的成本。2026-10-08。
 
+总览 `dangkang_overview.png`（活体、过渡、器物、3D）。
+
 工具：`tools/art/tripo.sh`（出图、编辑、图生 3D 都走它，每个任务存 `<name>.req.json` + `<name>.task.json`），`tools/art/blender/turntable.py`（转台对比图）。提示词放在同名 `.txt` / `_fix.txt`。
 
 ## 概念图（`concept/`）
