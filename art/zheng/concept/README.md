@@ -58,3 +58,14 @@
 - 编辑时写「Keep EVERYTHING else pixel-identical」比「Keep the same…」更能守住其余部分。
 - 半透明的火焰尾巴在换材质的编辑里很容易被整个删掉；器物态要让尾巴是实心的造型，这样图生 3D 也才能做出来。
 - A–E 五个 key 的免费额度用完后，新增 F、G 两个 workspace：每个 key 要在自己的 workspace 里建一个带 `image_generation` 工具的 agent（`POST /v1/agents`），agent id 写进两个脚本的 case 表。
+
+## Tripo 对照（2026-10-08，`tripo/`）
+
+用 Mistral 失败的那一步（`r2/living_v4.png` → `r2/transition_fix.txt`，Mistral 把尾巴全丢了）在 Tripo 的图生图上重跑：
+
+| 文件 | 模型 | 结果 | 积分 |
+|---|---|---|---|
+| `transition_banana2.png` | banana2 1K | 五尾、一角都在，前活后青铜开裂。但画风变写实（毛发更细），姿势也变了 | 10 |
+| `transition_sunburst.png` | chat_image_2.5_sunburst，low，1024 | **五尾、一角都在，姿势、镜头、卡通画风都保住了**，青铜部分开裂透金光 | 10 |
+
+结论：要求「其余不变」的编辑用 sunburst。之后出图改用 Tripo，见 `art/dangkang/README.md` 和 design/11 §7。

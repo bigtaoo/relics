@@ -6,7 +6,7 @@
 #   tripo.sh upload <image or model>                      -> prints file_token
 #   tripo.sh task <endpoint> <request.json> <out dir> <name>
 #     POSTs the request to /v3/<endpoint>, polls until done, saves <name>.task.json and downloads
-#     every *_url in the output as <name>.<ext> / <name>.<key>.<ext>. Prints the task id.
+#     every *_url in the output as <name>.<ext> (model or image) / <name>.<key>.<ext>. Prints the task id.
 set -euo pipefail
 API=https://openapi.tripo3d.ai/v3
 CONF="$HOME/.vibe/tripo_curl_key.conf"
@@ -33,12 +33,13 @@ case "$1" in
       echo "  $ST" >&2
       sleep 10
     done
-    # Download every URL in output; the main model keeps <name>, others get <name>.<key>.
-    json 'Object.entries(r.data.output||{}).filter(([k,v])=>typeof v==="string"&&v.startsWith("http")).map(([k,v])=>k+" "+v).join("\n")' \
+    # Download every URL in output (one nesting level, e.g. multiview); the main model or image
+    # keeps <name>, others get <name>.<key>.
+    json 'Object.entries(r.data.output||{}).flatMap(([k,v])=>v&&typeof v==="object"?Object.entries(v):[[k,v]]).filter(([k,v])=>typeof v==="string"&&v.startsWith("http")).map(([k,v])=>k+" "+v).join("\n")' \
       < "$OUT/$NAME.task.json" | while read -r KEY URL; do
         [ -n "$URL" ] || continue
         EXT=$(sed -E 's/\?.*//; s/.*\.//' <<<"$URL")
-        if [ "$KEY" = model_url ]; then F="$OUT/$NAME.$EXT"; else F="$OUT/$NAME.${KEY%_url}.$EXT"; fi
+        if [ "$KEY" = model_url ] || [ "$KEY" = generated_image_url ]; then F="$OUT/$NAME.$EXT"; else F="$OUT/$NAME.${KEY%_url}.$EXT"; fi
         curl -s -o "$F" "$URL"
         ls -l "$F" >&2
       done

@@ -1,0 +1,7 @@
+{
+ "model": "chat_image_2.5_sunburst",
+ "input": "file_66e877aa-ace9-4d73-9978-8ec599517805",
+ "prompt": "Keep exactly the same cartoon leopard, the same pose, the same single horn, the same five flame tails, the same proportions and the same camera angle. Make only this change:\n- The leopard is half bronze toy statue, half alive: the back half of the body, the back legs and the five tails are still smooth golden-brown bronze with teal-green patina, cracking open with bright molten gold light shining through the cracks. The head, the horn and the front legs are already alive with orange spotted fur and glowing eyes. Small bronze flakes float away.\n- Plain pure white background, no text.",
+ "size": "1024x1024",
+ "quality": "low"
+}

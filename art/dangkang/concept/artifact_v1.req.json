@@ -1,0 +1,7 @@
+{
+ "model": "chat_image_2.5_sunburst",
+ "input": "5f5f5ac1-7736-4389-9e8a-e049f68cef29",
+ "prompt": "Keep exactly the same cartoon boar, the same pose, the same two tusks, the same bristle ridge, the same rice-ear collar, the same proportions and the same camera angle. Make only this change:\n- The whole figure is now a cartoon bronze toy statue, ONE material only: smooth warm golden-brown bronze with soft teal-green patina in the recesses, the bristles and the rice ears are simple sculpted shapes in the same bronze, a few simple engraved swirl patterns on the body. Eyes are bronze too, closed calm expression like a sleeping statue. No fur, no paint, no pink, no colors other than bronze and patina.\n- Plain pure white background, no text.",
+ "size": "1024x1024",
+ "quality": "low"
+}

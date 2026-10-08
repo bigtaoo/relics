@@ -1,0 +1,7 @@
+{
+ "model": "chat_image_2.5_sunburst",
+ "input": "0336774e-32af-4b2f-b64e-c8ae76a7b6cb",
+ "prompt": "Small cleanup edit. Keep EVERYTHING else pixel-identical: the same boar, the same pose, the same two tusks, the same bristle ridge, the same rice-ear collar on the neck, the same style and camera.\n- The bunch of rice grains hanging from the mouth is erased; the mouth is closed and empty.\n- Plain pure white background, no text.",
+ "size": "1024x1024",
+ "quality": "low"
+}

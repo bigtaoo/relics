@@ -1,0 +1,3 @@
+Small cleanup edit. Keep EVERYTHING else pixel-identical: the same boar, the same pose, the same two tusks, the same bristle ridge, the same rice-ear collar on the neck, the same style and camera.
+- The bunch of rice grains hanging from the mouth is erased; the mouth is closed and empty.
+- Plain pure white background, no text.
