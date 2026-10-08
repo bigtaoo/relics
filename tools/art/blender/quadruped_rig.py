@@ -1,69 +1,34 @@
-# Builds the Zheng quadruped rig on a Tripo mesh and binds it with automatic (bone heat) weights.
-# usage: blender -b --python rig_zheng.py -- <in.glb> <out.blend> [target triangles]
-# Joint positions are in the imported glb's space (Z up, head toward +X), read from
-# orthographic renders and mesh slices of toon_v1.glb (see art/zheng/model/README.md).
-import bpy, bmesh, sys
+# Builds a quadruped rig on a Tripo mesh and binds it with automatic (bone heat) weights.
+# usage: blender -b --python quadruped_rig.py -- <creature> <in.glb> <out.blend> [target triangles]
+# <creature> names a joint table in creatures/ (e.g. zheng, dangkang). Joint positions are in the
+# imported glb's space (Z up, head toward +X, left +Y), read from orthographic renders and mesh
+# slices of the model (see art/<creature>/README.md).
+import bpy, bmesh, importlib, os, sys
 from mathutils import Vector
 from mathutils.bvhtree import BVHTree
 from mathutils.kdtree import KDTree
 
-# name: (head, tail, parent, deform)
-BONES = {
-    "root":       ((0.0, 0.08, -0.5), (0.0, 0.08, -0.4), None, False),
-    "hips":       ((-0.16, 0.17, -0.22), (-0.04, 0.11, -0.22), "root", True),
-    "spine":      ((-0.04, 0.11, -0.22), (0.08, 0.04, -0.2), "hips", True),
-    "chest":      ((0.08, 0.04, -0.2), (0.18, -0.01, -0.16), "spine", True),
-    "neck":       ((0.18, -0.01, -0.16), (0.25, 0.0, -0.06), "chest", True),
-    "head":       ((0.25, 0.0, -0.06), (0.38, 0.01, 0.02), "neck", True),
-    "horn":       ((0.32, 0.03, 0.1), (0.34, 0.045, 0.3), "head", True),
-    # legs: upper, lower, foot (L = +Y side of the body, the creature faces +X)
-    "thigh.L":    ((-0.11, 0.24, -0.22), (-0.12, 0.26, -0.33), "hips", True),
-    "shin.L":     ((-0.12, 0.26, -0.33), (-0.16, 0.3, -0.43), "thigh.L", True),
-    "foot.L":     ((-0.16, 0.3, -0.43), (-0.17, 0.32, -0.5), "shin.L", True),
-    "thigh.R":    ((-0.2, 0.13, -0.22), (-0.24, 0.14, -0.33), "hips", True),
-    "shin.R":     ((-0.24, 0.14, -0.33), (-0.3, 0.18, -0.43), "thigh.R", True),
-    "foot.R":     ((-0.3, 0.18, -0.43), (-0.32, 0.18, -0.5), "shin.R", True),
-    "upperarm.L": ((0.2, 0.05, -0.2), (0.22, 0.06, -0.32), "chest", True),
-    "forearm.L":  ((0.22, 0.06, -0.32), (0.27, 0.03, -0.43), "upperarm.L", True),
-    "hand.L":     ((0.27, 0.03, -0.43), (0.3, 0.02, -0.5), "forearm.L", True),
-    "upperarm.R": ((0.12, -0.05, -0.2), (0.135, -0.07, -0.32), "chest", True),
-    "forearm.R":  ((0.135, -0.07, -0.32), (0.18, -0.1, -0.43), "upperarm.R", True),
-    "hand.R":     ((0.18, -0.1, -0.43), (0.2, -0.11, -0.5), "forearm.R", True),
-}
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-# Five tails, numbered from the creature's right (-Y) to its left (+Y); points from root to tip.
-TAILS = [
-    [(-0.22, 0.0, -0.1), (-0.25, -0.22, 0.0), (-0.27, -0.36, 0.05), (-0.29, -0.42, 0.11), (-0.3, -0.49, 0.16)],
-    [(-0.22, 0.0, -0.1), (-0.24, -0.17, 0.13), (-0.27, -0.26, 0.24), (-0.3, -0.31, 0.35), (-0.31, -0.32, 0.42)],
-    [(-0.22, 0.0, -0.1), (-0.2, 0.02, 0.1), (-0.21, -0.01, 0.24), (-0.24, 0.04, 0.36), (-0.27, -0.01, 0.48)],
-    [(-0.22, 0.0, -0.1), (-0.22, 0.14, 0.16), (-0.25, 0.2, 0.3), (-0.29, 0.3, 0.4), (-0.31, 0.33, 0.48)],
-    [(-0.22, 0.0, -0.1), (-0.25, 0.16, 0.03), (-0.32, 0.3, 0.08), (-0.35, 0.36, 0.15), (-0.39, 0.48, 0.2)],
-]
 BIND_SCALE = 10  # bone heat fails on tiny meshes, so bind at 10x and scale back
-VOXEL = 0.08  # proxy resolution at bind scale; small enough to keep tails and legs apart
-
-for t, pts in enumerate(TAILS, 1):
-    for i in range(len(pts) - 1):
-        BONES[f"tail{t}.{i + 1}"] = (pts[i], pts[i + 1], "hips" if i == 0 else f"tail{t}.{i}", True)
-
-
 TARGET_TRIS = 3000  # design/08 §2: 46 units on a full board; 5000 for close-ups is indistinguishable on the board
 
-WHISKER_VOXEL = 0.01  # glb scale; coarse enough that whiskers vanish from the remesh
-WHISKER_TIP = 0.02  # vertices this far outside the remesh seed the whisker selection
-WHISKER_GROW = 0.004  # the selection grows along the mesh while still this far outside
-WHISKER_MAX_Z = 0.2  # the horn tip is thin too; keep it
+
+def creature(name):
+    return importlib.import_module(f"creatures.{name}")
 
 
-def remove_whiskers(mesh):
-    """Tripo models the whiskers as hair-thin tubes that render as floating sticks under the
-    toon outline. Compare the mesh with a coarse voxel remesh of itself: whisker tips stick
-    out of it, and flood-filling from the tips while staying outside picks the rest."""
+def remove_whiskers(mesh, w):
+    """Tripo models whiskers as hair-thin tubes that render as floating sticks under the toon
+    outline. Compare the mesh with a coarse voxel remesh of itself: whisker tips stick out of it,
+    and flood-filling from the tips while staying outside picks the rest.
+    w: voxel (glb scale, coarse enough that whiskers vanish), tip (seed distance outside the
+    remesh), grow (keep growing while this far outside), max_z (thin parts above it are kept)."""
     proxy = mesh.copy()
     proxy.data = mesh.data.copy()
     bpy.context.scene.collection.objects.link(proxy)
     rm = proxy.modifiers.new("remesh", 'REMESH')
-    rm.mode, rm.voxel_size = 'VOXEL', WHISKER_VOXEL
+    rm.mode, rm.voxel_size = 'VOXEL', w["voxel"]
     pb = bmesh.new()
     pb.from_object(proxy, bpy.context.evaluated_depsgraph_get())
     tree = BVHTree.FromBMesh(pb)
@@ -78,13 +43,13 @@ def remove_whiskers(mesh):
     bm = bmesh.new()
     bm.from_mesh(mesh.data)
     bmesh.ops.remove_doubles(bm, verts=bm.verts, dist=1e-5)
-    seeds = [v for v in bm.verts if v.co.z < WHISKER_MAX_Z and outside(v.co) > WHISKER_TIP]
+    seeds = [v for v in bm.verts if v.co.z < w["max_z"] and outside(v.co) > w["tip"]]
     sel, stack = set(seeds), list(seeds)
     while stack:
         v = stack.pop()
         for e in v.link_edges:
             o = e.other_vert(v)
-            if o not in sel and outside(o.co) > WHISKER_GROW:
+            if o not in sel and outside(o.co) > w["grow"]:
                 sel.add(o)
                 stack.append(o)
     kd = KDTree(len(sel))
@@ -147,15 +112,16 @@ def keep_largest_island(obj):
     bm.free()
 
 
-def bind(mesh, arm):
+def bind(mesh, arm, voxel):
     """Bone heat fails on AI meshes (open shells, floating whiskers), so weight a watertight
-    voxel-remeshed proxy instead and transfer its weights to the real mesh."""
+    voxel-remeshed proxy instead and transfer its weights to the real mesh.
+    voxel: proxy resolution at bind scale, small enough to keep thin limbs apart."""
     proxy = mesh.copy()
     proxy.data = mesh.data.copy()
     proxy.name = "weight_proxy"
     bpy.context.scene.collection.objects.link(proxy)
     rm = proxy.modifiers.new("remesh", 'REMESH')
-    rm.mode, rm.voxel_size = 'VOXEL', VOXEL
+    rm.mode, rm.voxel_size = 'VOXEL', voxel
     bpy.ops.object.select_all(action='DESELECT')
     proxy.select_set(True)
     bpy.context.view_layer.objects.active = proxy
@@ -183,24 +149,57 @@ def bind(mesh, arm):
     bpy.data.objects.remove(proxy)
 
 
-def paint_parts(mesh):
+def limit_weights(mesh, arm, local):
+    """On a round body the heat solve lets small parts (ears, tusks, a pendant) claim the torso
+    around them. local: {bone: r}; the bone keeps its weight within r of its segment and fades
+    out by 2r. What it loses is shared among the vertex's other bones in proportion to their
+    weights (to the parent bone if it has none)."""
+    for name, r in local.items():
+        bone = arm.data.bones[name]
+        a, b = arm.matrix_world @ bone.head_local, arm.matrix_world @ bone.tail_local
+        src, parent = mesh.vertex_groups[name], mesh.vertex_groups[bone.parent.name]
+        moved = 0
+        for v in mesh.data.vertices:
+            w = next((g.weight for g in v.groups if g.group == src.index), 0)
+            if not w:
+                continue
+            co = mesh.matrix_world @ v.co
+            u = max(0.0, min(1.0, (co - a).dot(b - a) / (b - a).length_squared))
+            keep = max(0.0, min(1.0, (2 * r - (co - a.lerp(b, u)).length) / r))
+            if keep == 1:
+                continue
+            lost = w * (1 - keep)
+            others = [(g.group, g.weight) for g in v.groups if g.group != src.index and g.weight > 0]
+            total = sum(x for _, x in others)
+            src.add([v.index], w * keep, 'REPLACE')
+            if total:
+                for gi, x in others:
+                    mesh.vertex_groups[gi].add([v.index], x + lost * x / total, 'REPLACE')
+            else:
+                parent.add([v.index], lost, 'ADD')
+            moved += 1
+        print("LIMIT", name, r, "verts", moved)
+
+
+def paint_parts(mesh, tails, horn):
     """Body-part masks for the toon shader's material variants, from the skin weights:
-    R = position along the tail (0 root, 1 tip), G = tail, B = horn."""
-    tails = {mesh.vertex_groups[f"tail{t}.{i}"].index: (i - 0.5) / 4 for t in range(1, 6) for i in range(1, 5)}
-    horn = mesh.vertex_groups["horn"].index
+    R = position along a tail chain (0 root, 1 tip), G = tail, B = horn (or tusks).
+    tails: bone chains, root to tip; horn: bone names."""
+    pos = {mesh.vertex_groups[b].index: (i + 0.5) / len(chain) for chain in tails for i, b in enumerate(chain)}
+    horn = {mesh.vertex_groups[b].index for b in horn}
     attr = mesh.data.color_attributes.new("parts", 'BYTE_COLOR', 'POINT')
     for v in mesh.data.vertices:
-        tail = sum(g.weight for g in v.groups if g.group in tails)
-        pos = sum(g.weight * tails[g.group] for g in v.groups if g.group in tails) / tail if tail else 0
-        h = sum(g.weight for g in v.groups if g.group == horn)
-        attr.data[v.index].color_srgb = (pos, min(tail, 1), min(h, 1), 1)
+        tail = sum(g.weight for g in v.groups if g.group in pos)
+        p = sum(g.weight * pos[g.group] for g in v.groups if g.group in pos) / tail if tail else 0
+        h = sum(g.weight for g in v.groups if g.group in horn)
+        attr.data[v.index].color_srgb = (p, min(tail, 1), min(h, 1), 1)
 
 
-def build(src, out, target=TARGET_TRIS):
+def build(spec, src, out, target=TARGET_TRIS):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     bpy.ops.import_scene.gltf(filepath=src)
     mesh = [o for o in bpy.context.scene.objects if o.type == 'MESH'][0]
-    mesh.name = "zheng"
+    mesh.name = spec.NAME
     # Bake the importer's transform into the mesh so mesh and armature share one space.
     bpy.ops.object.select_all(action='DESELECT')
     mesh.select_set(True)
@@ -208,7 +207,8 @@ def build(src, out, target=TARGET_TRIS):
     if mesh.parent:
         bpy.ops.object.parent_clear(type='CLEAR_KEEP_TRANSFORM')
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
-    remove_whiskers(mesh)
+    if spec.WHISKERS:
+        remove_whiskers(mesh, spec.WHISKERS)
     decimate(mesh, target)
     mesh.scale = (BIND_SCALE,) * 3
     bpy.ops.object.transform_apply(location=True, rotation=True, scale=True)
@@ -221,17 +221,17 @@ def build(src, out, target=TARGET_TRIS):
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.mode_set(mode='EDIT')
     eb = arm.data.edit_bones
-    for name, (h, t, parent, deform) in BONES.items():
+    for name, (h, t, parent, deform) in spec.BONES.items():
         b = eb.new(name)
         b.head, b.tail, b.use_deform = Vector(h) * BIND_SCALE, Vector(t) * BIND_SCALE, deform
-    for name, (h, t, parent, deform) in BONES.items():
+    for name, (h, t, parent, deform) in spec.BONES.items():
         if parent:
             b = eb[name]
             b.parent = eb[parent]
             b.use_connect = (b.head - eb[parent].tail).length < 1e-4
     bpy.ops.object.mode_set(mode='OBJECT')
 
-    bind(mesh, arm)
+    bind(mesh, arm, spec.VOXEL)
     # Back to glb scale: the mesh is parented to the rig, so scale the rig only, then apply on both.
     bpy.ops.object.select_all(action='DESELECT')
     arm.scale = (1 / BIND_SCALE,) * 3
@@ -239,16 +239,17 @@ def build(src, out, target=TARGET_TRIS):
         o.select_set(True)
     bpy.context.view_layer.objects.active = arm
     bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
-    paint_parts(mesh)
-    empty =[g.name for g in mesh.vertex_groups
+    limit_weights(mesh, arm, getattr(spec, "LOCAL", {}))
+    paint_parts(mesh, spec.TAIL_CHAINS, spec.HORN)
+    empty = [g.name for g in mesh.vertex_groups
              if not any(g.index in [e.group for e in v.groups if e.weight > 0.01] for v in mesh.data.vertices)]
     bpy.context.view_layer.update()
     ws = [mesh.matrix_world @ v.co for v in mesh.data.vertices]
     print("RIG height", round(max(v.z for v in ws) - min(v.z for v in ws), 3))
-    print("RIG bones", len(BONES), "groups", len(mesh.vertex_groups), "empty groups", empty)
+    print("RIG bones", len(spec.BONES), "groups", len(mesh.vertex_groups), "empty groups", empty)
     bpy.ops.wm.save_as_mainfile(filepath=out)
 
 
 if __name__ == "__main__":
     a = sys.argv[sys.argv.index("--") + 1:]
-    build(a[0], a[1], int(a[2]) if len(a) > 2 else TARGET_TRIS)
+    build(creature(a[0]), a[1], a[2], int(a[3]) if len(a) > 3 else TARGET_TRIS)

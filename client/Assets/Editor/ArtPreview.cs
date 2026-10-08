@@ -12,24 +12,25 @@ namespace Automatic.Editor
     /// Writes a character's toon material variants (ToonVariants) and renders them from the fixed
     /// battle camera (design/04 §2) into artifacts/art_preview/: a lineup of all variants side by
     /// side, then 5 frames of every clip per variant, so an import can be checked headless.
+    /// Unit "dangkang" reads Assets/HotRes/Art/Dangkang/dangkang.fbx, writes artifacts/art_preview/dangkang/.
     /// </summary>
     public static class ArtPreview
     {
-        private const string Dir = "Assets/HotRes/Art/Zheng/";
         private const int Size = 512;
         private const int FramesPerClip = 5;
         private static readonly Quaternion CameraYaw = Quaternion.Euler(0, 135, 0);
 
-        public static void Zheng()
+        public static void Render(string unit)
         {
             AssetDatabase.Refresh();
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(Dir + "zheng_basecolor.png");
-            var mats = ToonVariants.All.Select(v => (v.Name, Mat: v.Write(Dir + "zheng_" + v.Name + ".mat", tex))).ToArray();
+            var dir = $"Assets/HotRes/Art/{char.ToUpperInvariant(unit[0])}{unit[1..]}/{unit}";
+            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + "_basecolor.png");
+            var mats = ToonVariants.For(unit).Select(v => (v.Name, Mat: v.Write(dir + "_" + v.Name + ".mat", tex))).ToArray();
             AssetDatabase.SaveAssets();
-            var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../artifacts/art_preview"));
+            var outDir = Path.GetFullPath(Path.Combine(Application.dataPath, "../../artifacts/art_preview", unit));
             Directory.CreateDirectory(outDir);
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(Dir + "zheng.fbx") ?? throw new Exception("missing zheng.fbx");
-            var clips = AssetDatabase.LoadAllAssetsAtPath(Dir + "zheng.fbx").OfType<AnimationClip>()
+            var model = AssetDatabase.LoadAssetAtPath<GameObject>(dir + ".fbx") ?? throw new Exception($"missing {dir}.fbx");
+            var clips = AssetDatabase.LoadAllAssetsAtPath(dir + ".fbx").OfType<AnimationClip>()
                 .Where(c => !c.name.StartsWith("__preview__")).ToArray();
 
             NewStage();
@@ -46,15 +47,15 @@ namespace Automatic.Editor
             {
                 foreach (var other in units) other.SetActive(other == u);
                 u.transform.position = Vector3.zero;
-                var dir = Path.Combine(outDir, name);
-                Directory.CreateDirectory(dir);
+                var variantDir = Path.Combine(outDir, name);
+                Directory.CreateDirectory(variantDir);
                 foreach (var clip in clips)
                     for (var f = 0; f < FramesPerClip; f++)
                     {
                         clip.SampleAnimation(u, clip.length * f / (FramesPerClip - 1));
-                        Shoot(new[] { u }, Size, Size, 1, Path.Combine(dir, $"{clip.name}_{f}.png"));
+                        Shoot(new[] { u }, Size, Size, 1, Path.Combine(variantDir, $"{clip.name}_{f}.png"));
                     }
-                Debug.Log($"[ArtPreview] {name}: {clips.Length} clips");
+                Debug.Log($"[ArtPreview] {unit} {name}: {clips.Length} clips");
             }
         }
 
@@ -99,6 +100,9 @@ namespace Automatic.Editor
             cam.transform.LookAt(b.center);
             var rt = new RenderTexture(w, h, 24) { antiAliasing = 4 };
             cam.targetTexture = rt;
+            // The first render after units spawn reads skinned vertex buffers that are not filled yet
+            // (the lineup came out all one material, or black); a throwaway render fills them.
+            cam.Render();
             cam.Render();
 
             var prev = RenderTexture.active;

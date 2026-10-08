@@ -47,16 +47,16 @@
 | 步骤 | 工具 / 输入 | 结果 | 成本 |
 |---|---|---|---|
 | `toon_v1` 图生 3D | Tripo，`concept/r2/artifact_v1.png`（本身无底座），参数同 gen_v2 | 一角、五尾、四腿都对，19539 三角面，1 个材质。预览 `toon_v1.preview.png` | 30 积分（余 475） |
-| 绑定 `zheng_rig.blend` | `tools/art/blender/rig_zheng.py` | 39 根骨骼：root + 脊柱 5 + 角 + 四腿各 3 + 五尾各 4。自动权重，38 个变形骨骼全部有权重。检查图 `zheng_rig.posetest.png`：单独弯每条尾巴只动那一条 | 0 |
-| 动作 `zheng_anim.blend` | `tools/art/blender/anim_zheng.py`，程序化关键帧 | 待机（4 秒循环，2026-10-06 加大幅度，见 04 §6）、攻击、施法、受击、死亡、觉醒，共 6 个。检查图 `zheng_anim.sheet.png` | 0 |
+| 绑定 `zheng_rig.blend` | `tools/art/blender/rig_zheng.py`（2026-10-08 起是 `quadruped_rig.py` + `creatures/zheng.py`，见文末） | 39 根骨骼：root + 脊柱 5 + 角 + 四腿各 3 + 五尾各 4。自动权重，38 个变形骨骼全部有权重。检查图 `zheng_rig.posetest.png`：单独弯每条尾巴只动那一条 | 0 |
+| 动作 `zheng_anim.blend` | `tools/art/blender/anim_zheng.py`（现为 `quadruped_anim.py`），程序化关键帧 | 待机（4 秒循环，2026-10-06 加大幅度，见 04 §6）、攻击、施法、受击、死亡、觉醒，共 6 个。检查图 `zheng_anim.sheet.png` | 0 |
 | 导出 | `tools/art/blender/export_fbx.py` | `client/Assets/HotRes/Art/Zheng/zheng.fbx`（6 个 take）+ `zheng_basecolor.png`。回导 Blender 验证：骨骼、动作、蒙皮都在 | 0 |
 
 命令（仓库根目录，`B` 是 Blender 路径）：
 
 ```bash
 B="/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"; M=D:/automatic/art/zheng/model
-"$B" -b --python tools/art/blender/rig_zheng.py -- $M/toon_v1.glb $M/zheng_rig.blend
-"$B" -b --python tools/art/blender/anim_zheng.py -- $M/zheng_rig.blend $M/zheng_anim.blend
+"$B" -b --python tools/art/blender/quadruped_rig.py -- zheng $M/toon_v1.glb $M/zheng_rig.blend
+"$B" -b --python tools/art/blender/quadruped_anim.py -- zheng $M/zheng_rig.blend $M/zheng_anim.blend
 "$B" -b --python tools/art/blender/export_fbx.py -- $M/zheng_anim.blend D:/automatic/client/Assets/HotRes/Art/Zheng/zheng.fbx
 ```
 
@@ -69,11 +69,11 @@ B="/c/Program Files/Blender Foundation/Blender 5.2/blender.exe"; M=D:/automatic/
 
 质量判断：动作是「能用的占位」级别，节奏和姿态读得懂，但没有手 K 的弹性和夸张。正式版要么美术在这 6 个 blend 动作上精修，要么外包；骨骼和流程不用变。
 
-Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZheng`，导入规则在 `client/Assets/Editor/ArtPostprocessor.cs`，着色器 `client/Assets/HotRes/Shaders/Toon.shader`，每个动作 5 帧截图输出到 `artifacts/art_preview/`，汇总图 `zheng_unity.sheet.png`。
+Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZheng`，导入规则在 `client/Assets/Editor/ArtPostprocessor.cs`，着色器 `client/Assets/HotRes/Shaders/Toon.shader`，每个动作 5 帧截图输出到 `artifacts/art_preview/zheng/`，汇总图 `zheng_unity.sheet.png`。
 
 ## 2026-10-06 删胡须 + 材质变体
 
-**胡须**：Tripo 把胡须做成头发丝粗细的管子，挂在脸上（焊接 UV 接缝后和身体是同一块网格，按碎块删不掉），在 Unity 描边下变成黑色细棍。`rig_zheng.py` 的 `remove_whiskers`：
+**胡须**：Tripo 把胡须做成头发丝粗细的管子，挂在脸上（焊接 UV 接缝后和身体是同一块网格，按碎块删不掉），在 Unity 描边下变成黑色细棍。`quadruped_rig.py` 的 `remove_whiskers`（参数在 `creatures/zheng.py` 的 `WHISKERS`）：
 - 用 0.01 体素重构一份粗外壳，胡须太细，不会进入外壳。
 - 离外壳 > 0.02 的顶点当种子（胡须尖），沿网格往回扩，只要还在外壳外 0.004 以上就算胡须。
 - z > 0.2 的不算（角尖也细，要保留）。结果删掉 238 个顶点，阈值在 0.002–0.008 间结果稳定，不会扩进脸里。
@@ -96,7 +96,7 @@ Unity：`unity run client -- -executeMethod Automatic.Editor.Batch.ArtPreviewZhe
 
 ## 2026-10-06 减面
 
-`rig_zheng.py` 的 `decimate`：删胡须之后、绑定之前执行。先焊接 glb 在 UV 接缝处拆开的顶点（UV 按角存，接缝不受影响），再用 Blender 的 collapse 减面到目标面数（默认 3000，第 3 个参数可改）。权重在减面后的网格上计算，所以绑定流程不用改。
+`quadruped_rig.py` 的 `decimate`：删胡须之后、绑定之前执行。先焊接 glb 在 UV 接缝处拆开的顶点（UV 按角存，接缝不受影响），再用 Blender 的 collapse 减面到目标面数（默认 3000，第 3 个参数可改）。权重在减面后的网格上计算，所以绑定流程不用改。
 
 | 面数 | 近景（`zheng_variants.png` 的镜头） | 棋盘战斗镜头 | 满场 46 只 |
 |---|---|---|---|
@@ -135,3 +135,9 @@ blender -b --python tools/art/blender/export_fbx.py -- artifacts/crowd/zheng_lo.
 - 结果：3000 面减到 400 面，在 Unity 里是 605 个顶点（UV 接缝处顶点被拆开）。骨骼还是 39 根。
 - 减面修改器要先挪到修改器栈的第一位再应用。否则应用时会连同骨骼的当前姿势一起烘进网格。
 - 正式的召唤物会是另外的模型，骨骼应该更少。这里只是拿来测性能。
+
+## 2026-10-08 拆成四足家族脚本
+
+做第二只四足当康时，`rig_zheng.py` / `anim_zheng.py` 拆成了共用部分 `quadruped_rig.py` / `quadruped_anim.py` 和关节表 `creatures/zheng.py`（骨骼、五尾链、胡须参数、五尾次级动画）。拆完重跑，网格、权重、遮罩和全部关键帧的哈希都和拆之前一致，所以 `zheng.fbx` 没有重导。命令见上面「第 2 轮」。拆分方式和当康的结果见 `art/dangkang/README.md`。
+
+同一天修了 `ArtPreview` 的 5 套材质合影 `zheng_variants.png`。这张图最近一直是错的（10-07 中午那次还正常）：5 只全是同一个材质，或者全黑，单只的截图正常。原因是刚生成的单位第一次渲染时，蒙皮顶点还没算好。现在每次截图前先空渲一次。`zheng_variants.png` 已经重新生成，陶是灰色的。

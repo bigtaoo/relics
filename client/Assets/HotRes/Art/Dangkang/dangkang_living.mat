@@ -7,7 +7,7 @@ Material:
   m_CorrespondingSourceObject: {fileID: 0}
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
-  m_Name: zheng_bronze
+  m_Name: dangkang_living
   m_Shader: {fileID: 4800000, guid: 955dc9b5d89a7f744bad3002d3c7df02, type: 3}
   m_Parent: {fileID: 0}
   m_ModifiedSerializedProperties: 0
@@ -24,7 +24,7 @@ Material:
     serializedVersion: 3
     m_TexEnvs:
     - _BaseMap:
-        m_Texture: {fileID: 2800000, guid: aaae11bde2d5dcd4b83f6ec4480e1364, type: 3}
+        m_Texture: {fileID: 2800000, guid: 528ad41c0a7290a46bfe5190891f7a80, type: 3}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
     - _VatNrm:
@@ -37,28 +37,28 @@ Material:
         m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
-    - _BodyLum: 0.19
+    - _BodyLum: 0.15
     - _OutlineWidth: 0.006
-    - _Recolor: 0
+    - _Recolor: 1
     - _RimPower: 4
     - _RimStrength: 0.35
     - _ShadeSoftness: 0.04
     - _ShadeThreshold: 0.05
-    - _SpecSize: 0.06
-    - _SpotLum: 0.125
+    - _SpecSize: 0.08
+    - _SpotLum: 0.03
     - _TailGlow: 0
     - _Vat: 0
     - _VatFps: 30
     m_Colors:
     - _BaseColor: {r: 1, g: 1, b: 1, a: 1}
-    - _BodyColor: {r: 0, g: 0, b: 0, a: 0}
-    - _HornColor: {r: 0, g: 0, b: 0, a: 0}
+    - _BodyColor: {r: 0.74, g: 0.4, b: 0.2, a: 1}
+    - _HornColor: {r: 0.95, g: 0.9, b: 0.78, a: 1}
     - _OutlineColor: {r: 0.13, g: 0.09, b: 0.05, a: 1}
     - _RimColor: {r: 1, g: 0.92, b: 0.7, a: 1}
-    - _ShadeColor: {r: 0.55, g: 0.5, b: 0.62, a: 1}
-    - _SpecColor: {r: 0.5, g: 0.42, b: 0.25, a: 1}
-    - _SpotColor: {r: 0, g: 0, b: 0, a: 0}
-    - _TailRootColor: {r: 0, g: 0, b: 0, a: 0}
-    - _TailTipColor: {r: 0, g: 0, b: 0, a: 0}
+    - _ShadeColor: {r: 0.75, g: 0.58, b: 0.6, a: 1}
+    - _SpecColor: {r: 0.25, g: 0.2, b: 0.15, a: 1}
+    - _SpotColor: {r: 0.55, g: 0.3, b: 0.16, a: 1}
+    - _TailRootColor: {r: 0.74, g: 0.4, b: 0.2, a: 1}
+    - _TailTipColor: {r: 0.74, g: 0.4, b: 0.2, a: 1}
   m_BuildTextureStacks: []
   m_AllowLocking: 1

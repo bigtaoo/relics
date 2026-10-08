@@ -1,4 +1,4 @@
-# Side-view check sheet of the Zheng clips, straight from the animated .blend (no Unity round trip).
+# Side-view check sheet of a creature's clips, straight from the animated .blend (no Unity round trip).
 # usage: blender -b --python anim_sheet.py -- <anim.blend> <out_dir> [clip ...]
 # Writes <out_dir>/<clip>_<k>.png, eight frames per clip across its length, rendered with
 # Workbench from the creature's left side (head to the right of the image).

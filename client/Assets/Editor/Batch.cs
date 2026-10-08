@@ -44,7 +44,9 @@ namespace Automatic.Editor
             HotUpdateBuild.Build(target, HotUpdateBuild.NextVersion(target), EBundledCopyOption.None);
         });
 
-        public static void ArtPreviewZheng() => Run(ArtPreview.Zheng);
+        public static void ArtPreviewZheng() => Run(() => ArtPreview.Render("zheng"));
+
+        public static void ArtPreviewDangkang() => Run(() => ArtPreview.Render("dangkang"));
 
         public static void BoardSlice() => Run(Automatic.Editor.BoardSlice.Build);
 

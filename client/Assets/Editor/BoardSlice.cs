@@ -56,7 +56,7 @@ namespace Automatic.Editor
             var clips = AssetDatabase.LoadAllAssetsAtPath(ZhengDir + "zheng.fbx").OfType<AnimationClip>()
                 .Where(c => !c.name.StartsWith("__preview__")).ToDictionary(c => c.name);
             var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(ZhengDir + "zheng_basecolor.png");
-            var mats = ToonVariants.All.ToDictionary(v => v.Name, v => v.Write(ZhengDir + "zheng_" + v.Name + ".mat", tex));
+            var mats = ToonVariants.For("zheng").ToDictionary(v => v.Name, v => v.Write(ZhengDir + "zheng_" + v.Name + ".mat", tex));
             var controller = Controller(clips.Values);
             var team = new[]
             {

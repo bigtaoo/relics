@@ -2,8 +2,9 @@
 // inverted-hull outline.
 // Material variants (cost tiers, living state) share one base texture: with _Recolor = 1 the
 // texture only supplies shading detail and the patina mask (green over red), and colours come
-// from the material. Vertex colour carries body-part masks from tools/art/blender/rig_zheng.py:
-// R = position along the tail, G = tail, B = horn.
+// from the material. _BodyLum / _SpotLum are the base texture's median linear luminance of body
+// and patina, per character. Vertex colour carries body-part masks from
+// tools/art/blender/quadruped_rig.py: R = position along the tail, G = tail, B = horn (or tusks).
 // _VAT (crowd units, design/08 §2): no skinning; each vertex reads its baked position and normal
 // from vertex animation textures (CrowdBake), per instance clip from _Clip, drawn instanced.
 Shader "Relics/Toon"
@@ -19,6 +20,8 @@ Shader "Relics/Toon"
         _SpecSize ("Highlight Size", Range(0, 0.5)) = 0.08
         [Header(Variant)]
         _Recolor ("Recolor", Range(0, 1)) = 0
+        _BodyLum ("Body Luminance", Range(0.01, 1)) = 0.19
+        _SpotLum ("Spot Luminance", Range(0.01, 1)) = 0.125
         _BodyColor ("Body", Color) = (1, 1, 1, 1)
         _SpotColor ("Spots", Color) = (0.5, 0.5, 0.5, 1)
         _HornColor ("Horn", Color) = (1, 1, 1, 1)
@@ -52,6 +55,8 @@ Shader "Relics/Toon"
             half4 _SpecColor;
             half _SpecSize;
             half _Recolor;
+            half _BodyLum;
+            half _SpotLum;
             half4 _BodyColor;
             half4 _SpotColor;
             half4 _HornColor;
@@ -125,7 +130,7 @@ Shader "Relics/Toon"
                 // Recolour: patina spots are green over red; luminance relative to the median of
                 // body / spots (linear) keeps the sculpted shading and crevices.
                 half spot = smoothstep(-0.03, 0.03, tex.g - tex.r);
-                half detail = min(dot(tex, half3(0.3, 0.59, 0.11)) / lerp(0.19, 0.125, spot), 1.5);
+                half detail = min(dot(tex, half3(0.3, 0.59, 0.11)) / lerp(_BodyLum, _SpotLum, spot), 1.5);
                 half tailPos = saturate((i.parts.r - 0.125) / 0.75);
                 half3 tail = lerp(_TailRootColor.rgb, _TailTipColor.rgb, tailPos);
                 half3 tint = lerp(_BodyColor.rgb, _SpotColor.rgb, spot);

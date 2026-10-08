@@ -36,3 +36,4 @@ client/Assets/StreamingAssets.meta
 # Blender save backups
 *.blend1
 client/.utmp/
+__pycache__/
