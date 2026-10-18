@@ -184,6 +184,13 @@ worktrees that each publish, say, `0.1.0.1` with different content make the play
 cached manifest and fail on 404s. In a worktree, set `artifacts/cdn/PC/DefaultPackage.version` to a
 number nobody else uses (e.g. `0.1.0.8300`) before `BuildHotUpdate`, which publishes the next one.
 
+The CDN address is shared the same way. A `relics://run?cdn=...` launch saves its `cdn` in PlayerPrefs
+(`BootConfig.CdnRoot`), and every `Relics.exe` on the machine reads the same PlayerPrefs. Worktrees
+that run players in parallel each serve their CDN on their own port and always launch with
+`-url "relics://run?cdn=http://127.0.0.1:<port>"`; afterwards, launch once with port 8000 so the
+main checkout's default (`LocalCdnRoot`) is back. Only one phone of each kind is on the desk, so
+on-device runs (`android.sh`) go one worktree at a time.
+
 `tools/hotupdate/` reruns the failure tests:
 - `faulty_cdn.py` serves `artifacts/cdn` with a bandwidth cap, stalls or dropped connections, and
   Range support. `python -m http.server` has no Range support, so resume cannot be tested on it.

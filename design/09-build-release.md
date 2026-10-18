@@ -86,12 +86,21 @@
 ### Unity 授权
 
 - CI 运行 Unity 需要授权，GameCI 的文档说明了 Personal 和 Pro 两种激活方式。授权信息存进 Secrets。
+- 2026-10-18 核对：本机没有 `C:\ProgramData\Unity\Unity_lic.ulf`，只有 Hub 的 `%LOCALAPPDATA%\Unity\licenses\UnityEntitlementLicense.xml`，后者不能当 `UNITY_LICENSE` 用。要按 GameCI 的 Personal 激活流程拿到 `.ulf`，把整份文件内容填进 Secret。
+
+### 签名材料与 Secrets（2026-10-18 核对）
+
+- 本仓库（bigtaoo/relics）当天**一个 Secret 都没有**。Secrets 的值读不出来，不能从 SumQuest-OLD 或 funny 复制，只能拿原始文件重新填。
+- funny 的团队级材料可以复用：Apple Distribution 证书（`.p12` 和它的密码）、ASC API Key（`.p8`、Key ID、Issuer ID），前提是这些文件还在手上。描述文件绑定 Bundle ID，必须为 `com.gamestao.relics` 重新生成。
+- 文件找不到时，没有 Mac 也能重做证书：用 openssl 生成私钥和 CSR → 在 Apple 后台签出 Distribution `.cer` → 用 openssl 合成 `.p12`。OpenSSL 3 要加 `-legacy`，否则 macOS 钥匙串可能导不进去，这一条还没实测。`.p8` 只能下载一次，丢了只能新建一个 Key。
+- 填法：先 `base64 -w0 <文件>`，再用 `gh secret set <名字> -R bigtaoo/relics` 填进去。这条命令从标准输入读值，值不会进命令行历史。名单和含义见 `release-ios.yml` 文件头。
+- 退路：如果 CI 里 Unity 导出一直卡在授权，可以在本机导出 Xcode 工程再推上去，CI 只做签名和上传。
 
 ## 5. 待办
 
 - [x] Bundle ID 和 Android 包名：`com.gamestao.relics`（2026-10-07 定，上架后不可改；在 `ProjectSetup` 里设置）。`companyName` 还是 `bigtaoo`，因为它决定本地数据目录（`LocalLow/bigtaoo/Relics`）
 - [ ] 确定 Steam App ID
-- [ ] Apple：在开发者后台注册 Bundle ID，生成这个 Bundle ID 的 App Store 描述文件；在 App Store Connect 新建 App 记录。把 funny 的签名证书、Team ID、ASC API Key，加上新的描述文件，存进本仓库的 Secrets（Secrets 的值不能跨仓库复制，要重新填）。名单见 `release-ios.yml` 文件头
+- [ ] Apple（用户本人操作，材料见 §4「签名材料与 Secrets」）：在开发者后台注册 Bundle ID，生成这个 Bundle ID 的 App Store 描述文件；在 App Store Connect 新建 App 记录。把 funny 的签名证书、Team ID、ASC API Key，加上新的描述文件，存进本仓库的 Secrets（Secrets 的值不能跨仓库复制，要重新填）。名单见 `release-ios.yml` 文件头
 - [ ] Steam：注册 App（Steam Direct 费用），建 depot 和 beta 分支
-- [ ] Unity 授权接入 CI：配 `UNITY_EMAIL` / `UNITY_PASSWORD` / `UNITY_LICENSE`（`Unity_lic.ulf` 的内容，必需），先跑一次 `destination: none`
+- [ ] Unity 授权接入 CI：配 `UNITY_EMAIL` / `UNITY_PASSWORD` / `UNITY_LICENSE`（`Unity_lic.ulf` 的内容，必需；本机还没有这个文件，见 §4），先跑一次 `destination: none`
 - [ ] 07 §7 热更最小验证在 TestFlight 真机上跑通
