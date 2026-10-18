@@ -48,7 +48,9 @@ The game is portrait everywhere (design/DECISIONS.md ADR-011, art/ui/README.md ย
 lays out the HUD in a column no wider than 0.6 of its height; a wider window or fullscreen shows
 side margins. Phones scale the HUD by physical size. To see a phone on PC, open the window at its
 aspect and name it: `-device iphone13|a16` (e.g. `-screen-width 540 -screen-height 1170`). With
-`-autoplay` the log has the on-screen size of the board cells (`[Demo] ... front-row cell`).
+`-autoplay` the log has the on-screen size of the board cells (`[Demo] ... front-row cell`) and two
+`[Readability]` lines (prep and battle framing): cell pitch, pedestal, health bar and acting-ring band
+at the near and far rows and benches, in mm with `-device`, else in px (art/board/README.md).
 
 Art in `Assets/HotRes/` (models, clips, prefabs) only needs `BuildHotUpdate`; the player picks up
 the new version on its next start. Player settings stay as built: `runInBackground` is on, since
@@ -87,7 +89,9 @@ Board frame-rate test (design/08 ยง2): with the CDN running, `Relics.exe -bench 
 -screen-height 1080 -screen-fullscreen 0 -logFile bench.log` loads `board_west` from the resource
 package, runs uncapped for 10 s and logs `[Bench]` lines (frame times, per-frame render counters as
 medians, memory), then quits. `-nosrpbatch` turns the SRP Batcher off and `-nooutline` the toon
-outline, to see what each costs.
+outline, to see what each costs. The camera is the game's portrait battle framing (HUD top shown,
+shop tray hidden, `DemoFraming.Battle`), not the scene's saved landscape one; open a portrait window
+(e.g. `-screen-width 540 -screen-height 960`) and add `-device iphone13|a16` for a phone's layout.
 
 Crowd test (summon builds, ~300 units): `-bench -crowd 254` adds 254 low-poly summons
 (`zheng_lo.fbx`, from `tools/art/blender/lowpoly.py`) as Animator + SkinnedMeshRenderer units;

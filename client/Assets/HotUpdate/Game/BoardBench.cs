@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Unity.Profiling;
 using UnityEngine;
+using UnityEngine.UI;
 using YooAsset;
 
 namespace Automatic.Game
@@ -58,6 +59,7 @@ namespace Automatic.Game
             Debug.Log($"[Bench] scene {Scene} {load.Status}, screen {Screen.width}x{Screen.height}, {SystemInfo.graphicsDeviceName}, {SystemInfo.processorType}, " +
                       $"SRP Batcher {UnityEngine.Rendering.GraphicsSettings.useScriptableRenderPipelineBatching}, development {Debug.isDebugBuild}");
 
+            Frame(package);
             var crowd = CrowdBench.Requested() > 0 ? CrowdBench.Create(package, CrowdBench.Requested()) : null;
             if (crowd != null) Debug.Log("[Bench] crowd: " + crowd.Describe());
 
@@ -131,6 +133,28 @@ namespace Automatic.Game
                 $"{n} {(memory[i].Valid ? (memory[i].LastValue / 1048576.0).ToString("F1") : "n/a")}")));
             foreach (var r in render.Concat(memory)) r.Dispose();
             BenchReport.Finish();
+        }
+
+        /// <summary>
+        /// The game's battle framing instead of the scene's saved camera: the portrait column with
+        /// the HUD top (round bar, hand panel) as in a battle, the shop tray gone, and the whole
+        /// table fitted under it (HudLayout, DemoFraming). -device iphone13|a16 as in the demo.
+        /// </summary>
+        private static void Frame(ResourcePackage package)
+        {
+            var cam = Camera.main;
+            var canvas = new GameObject("Hud", typeof(Canvas), typeof(CanvasScaler)).GetComponent<Canvas>();
+            canvas.renderMode = RenderMode.ScreenSpaceOverlay;
+            var layout = HudLayout.Detect();
+            var hud = layout.Setup(canvas, canvas.GetComponent<CanvasScaler>(), cam);
+            var shop = Instantiate(package.LoadAssetSync<GameObject>("ui_shop").AssetObject as GameObject, hud).GetComponent<RectTransform>();
+            layout.Apply(shop);
+            shop.Find("ShopTray").gameObject.SetActive(false);
+            // The scaler applies its factor in its own Update, after this frame's layout; apply it now.
+            canvas.scaleFactor = canvas.GetComponent<CanvasScaler>().scaleFactor;
+            Canvas.ForceUpdateCanvases();
+            cam.transform.position = DemoFraming.Battle(cam, layout.Viewport(layout.BattleArea));
+            Debug.Log($"[Bench] battle framing, column {layout.ColumnPx.width:F0}x{layout.ColumnPx.height:F0} px");
         }
 
         /// <summary>

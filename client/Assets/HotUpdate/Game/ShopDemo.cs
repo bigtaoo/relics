@@ -57,6 +57,7 @@ namespace Automatic.Game
         private Vector3 prepPos, battlePos, huCentre;
         private HudLayout layout;
         private Rect freeAt;
+        private Vector2Int reported;
         private BattleShow battle;
 
         public static void Run(ResourcePackage package)
@@ -153,9 +154,7 @@ namespace Automatic.Game
             newcomerAt = hand[^1].Root.position;
             markers = units.SelectMany(u => u.Root.Cast<Transform>()).Where(t => t.name is "BarBack" or "BarFill" or "ActiveRing").ToList();
 
-            var table = GameObject.Find("TableTop").GetComponent<Renderer>().bounds;
-            halfWidth = table.extents.x;
-            halfDepth = table.extents.z;
+            (halfWidth, halfDepth) = DemoFraming.Table();
             prepTop = enemyAt.Min(p => p.z) - 0.1f; // the far bank of the river
 
             // Preparation phase: only the player's side, every piece an artifact of its tier. Pieces
@@ -266,7 +265,15 @@ namespace Automatic.Game
             {
                 freeAt = layout.Viewport(layout.Free);
                 prepPos = DemoFraming.Prep(cam, halfWidth, halfDepth, prepTop, freeAt);
-                battlePos = DemoFraming.Fit(cam, halfWidth, -halfDepth, halfDepth, 1, layout.Viewport(layout.BattleArea));
+                battlePos = DemoFraming.Battle(cam, layout.Viewport(layout.BattleArea));
+                if (reported != new Vector2Int(Screen.width, Screen.height))
+                {
+                    reported = new Vector2Int(Screen.width, Screen.height);
+                    var a = allies.Select(u => u.Root).ToList();
+                    var e = enemies.Select(u => u.Root).ToList();
+                    Debug.Log(Readability.Report("prep", cam, prepPos, layout, a, e, enemyAt));
+                    Debug.Log(Readability.Report("battle", cam, battlePos, layout, a, e, enemyAt));
+                }
                 var show = new Vector3[4];
                 layout.Free.GetWorldCorners(show);
                 huCentre = ui.Shop.InverseTransformPoint((show[0] + show[2]) / 2);

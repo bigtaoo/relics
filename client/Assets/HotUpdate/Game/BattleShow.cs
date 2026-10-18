@@ -21,6 +21,8 @@ namespace Automatic.Game
         public static readonly string[] Prefabs = { Charge, Bolt, Impact, Claw, Shatter, Buff, Dust };
 
         private const float BarWidth = 0.56f, Turn = 40, ImpactAt = 0.34f, Release = 0.5f, Flight = 0.35f;
+        /// <summary>The acting ring breathes up to this much wider, this often a second (art/board/README.md, portrait readability).</summary>
+        private const float RingPulse = 0.25f, RingRate = 2;
         private static readonly int RimColor = Shader.PropertyToID("_RimColor"), RimPower = Shader.PropertyToID("_RimPower"), RimStrength = Shader.PropertyToID("_RimStrength");
 
         private sealed class Piece
@@ -111,6 +113,12 @@ namespace Automatic.Game
             {
                 p.Shown = Mathf.MoveTowards(p.Shown, p.Health, Time.deltaTime * 1.5f);
                 Bar(p);
+            }
+            // A still ring 1 mm thin is lost on the red half and under the numbers; a moving one is not.
+            if (ring != null && ring.gameObject.activeSelf)
+            {
+                var k = 1 + RingPulse * (0.5f - 0.5f * Mathf.Cos(Now * 2 * Mathf.PI * RingRate));
+                ring.localScale = new Vector3(k, 1, k);
             }
             pops.Update(Now);
             // (HuShowUi sets the round bar to the battle every frame.)
