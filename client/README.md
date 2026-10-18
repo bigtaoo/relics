@@ -103,6 +103,16 @@ seconds, and a `[Bench] t=` line every 30 s logs that window with the battery te
 status. `tools/bench/android.sh [--install] suite|soak|sim` installs `artifacts/player/Android/Relics.apk`,
 sets up `adb reverse tcp:8000 tcp:8000` for the local CDN, runs the cases and keeps the `[Bench]`
 lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`ProjectSetup`).
+`tools/bench/android.sh <name> "<switches>"` runs a single case. To find where the GPU time goes,
+`-scale S` renders at S times the screen resolution, `-nohdr` turns HDR off and `-noshadow` turns the
+main light's shadows off (next to `-nooutline`). Compare frame rates, not the reported GPU time: Mali
+lowers its clock under light load, so a frame capped at 30 fps reports more GPU time than an uncapped one.
+
+On Samsung phones (One UI 6+), USB debugging stays greyed out while *Auto Blocker* is on
+(Settings → Security and privacy → Auto Blocker). It also blocks installing the APK. Turn it off,
+enable USB debugging, then unplug and replug the cable: until then Windows shows only the MTP and
+modem interfaces and `adb devices` is empty. The adb used is the one inside Unity's Android module
+(path at the top of `android.sh`).
 
 iOS has neither a command line nor adb. There the switches come from the link that opened the app,
 `relics://run?cdn=http://<pc>:8000&name=vat254&args=-bench+-crowd+254+-vat`. The shell keeps the

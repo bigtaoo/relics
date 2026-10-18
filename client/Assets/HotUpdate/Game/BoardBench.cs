@@ -65,6 +65,7 @@ namespace Automatic.Game
                 foreach (var r in FindObjectsByType<Renderer>(FindObjectsSortMode.None))
                 foreach (var m in r.sharedMaterials)
                     if (m != null && m.shader.name == "Relics/Toon") m.SetShaderPassEnabled("Outline", false);
+            GpuSwitches();
 
             yield return new WaitForSecondsRealtime(Warmup);
             var shot = LaunchArgs.After("-shot");
@@ -130,6 +131,24 @@ namespace Automatic.Game
                 $"{n} {(memory[i].Valid ? (memory[i].LastValue / 1048576.0).ToString("F1") : "n/a")}")));
             foreach (var r in render.Concat(memory)) r.Dispose();
             BenchReport.Finish();
+        }
+
+        /// <summary>
+        /// Where the GPU time goes on phones (design/08 §2): -scale S renders at S times the screen
+        /// resolution, -nohdr turns the HDR color buffer off, -noshadow turns the main light's
+        /// shadows off. Engine-core APIs only, so the hot assembly needs no URP reference.
+        /// </summary>
+        private static void GpuSwitches()
+        {
+            if (float.TryParse(LaunchArgs.After("-scale"), System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out var scale))
+                Screen.SetResolution(Mathf.RoundToInt(Screen.width * scale), Mathf.RoundToInt(Screen.height * scale), true);
+            if (LaunchArgs.Has("-nohdr"))
+                foreach (var c in Camera.allCameras) c.allowHDR = false;
+            if (LaunchArgs.Has("-noshadow"))
+                foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.shadows = LightShadows.None;
+            Debug.Log($"[Bench] gpu switches: scale {(scale > 0 ? scale : 1)}, hdr {!LaunchArgs.Has("-nohdr")}, " +
+                      $"shadows {!LaunchArgs.Has("-noshadow")}, outline {!LaunchArgs.Has("-nooutline")}");
         }
 
         private static string Tail(List<double> v, int n) => v.Count > 0 ? $"{v.Skip(Mathf.Max(0, v.Count - n)).Average():F2} ms" : "n/a";
