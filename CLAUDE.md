@@ -26,7 +26,9 @@ Unity 客户端 + C# 服务端，共享一份定点数确定性战斗核心。�
 - 禁止遍历 `Dictionary` / `HashSet` 来决定逻辑顺序；需要顺序时用 List 或按 id 排序。
 - 只有结果确实依赖随机时才抽随机数（条件抽取会让之后的每次抽取都错位）。
 - 任何改变战斗结果的改动都要升 `EngineVersion` 并记录（等对应代码落地后执行）。
-- 后续会用 Roslyn 分析器把以上规则变成编译错误。在那之前靠代码评审。
+- 前两条（加上 `lock`、`async`、字符串 `GetHashCode`）由 Roslyn 分析器 `src/Battle.Core.Analyzers` 变成编译错误 DET001–DET009，dotnet 构建和 Unity 编译都会报，`#pragma` / `NoWarn` 压不掉。只对带 `[assembly: EnforceDeterminism]` 的程序集生效（目前只有 Battle.Core）。
+- 确实需要例外时，在成员或类型上加 `[DeterminismExempt("理由")]`，理由不能为空；同时把它加进 design/01 §6 的豁免清单和 `DeterminismTests` 里的期望列表，否则测试失败。
+- 改分析器后，构建会把新 DLL 复制到 `src/Battle.Core/Analyzers/`（Unity 用这份），一起提交。
 
 ## 验证
 

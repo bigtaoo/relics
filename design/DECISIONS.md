@@ -108,3 +108,16 @@
   - 屏幕方向是壳的设置（Player Settings），改方向要发新壳。
   - 08 §6 的验收比例改为：手机 19.5:9 / 20:9 竖屏、PC 竖长窗口、PC 16:9 全屏（留边）。
   - 编辑器渲染的评审图（`BoardSlice`、`UiSlice`、`FxTimeline`）还是横屏比例，UI 预制体也还是按 1920×1080 横屏搭的，运行时由 `HudLayout` 重新排成竖屏。正式做 UI 时直接按竖屏搭预制体，评审图一起改。
+
+## ADR-012 · 2026-10-18 · 确定性规则由 Roslyn 分析器在编译期强制
+
+- **结论**：CLAUDE.md 的确定性规则由 `src/Battle.Core.Analyzers` 报成编译错误（DET001–DET009，规则表见 01 §6）。dotnet 通过 `ProjectReference OutputItemType="Analyzer"` 加载；Unity 加载 `src/Battle.Core/Analyzers/` 里带 `RoslynAnalyzer` 标签的 DLL 副本。例外只能用 `[DeterminismExempt("理由")]`，并且要登记在 01 §6。
+- **理由**：
+  - 靠评审守不住：一个 `foreach` 遍历 `Dictionary`、一次 `Math.Sqrt` 就能让客户端和服务端的哈希分叉，而且只在特定数据下才出现，很难查。
+  - Unity 6000.3 自带 Roslyn 4.3.1，分析器固定引用 `Microsoft.CodeAnalysis.CSharp` 4.3.1、目标 netstandard2.0，两边用同一份 DLL。
+  - Unity 会把分析器套到所在 asmdef 和所有引用它的程序集上，客户端代码用 `float` 是正常的。所以分析器只检查带 `[assembly: EnforceDeterminism]` 标记的程序集，不靠目录范围。
+  - 规则标成 NotConfigurable，`#pragma` / `NoWarn` / `.editorconfig` 都关不掉，例外必须写在代码里、写明理由，评审时看得见。
+  - `lock` 也禁：Core 是单线程的，出现 `lock` 说明有人在引入并发。字符串 `GetHashCode` 在 .NET Core 里每个进程随机，也一起禁。
+- **影响**：
+  - 改分析器后要连同 `src/Battle.Core/Analyzers/` 里的 DLL 一起提交。构建是确定性的，代码不变时 DLL 字节不变，不会产生无意义的改动。
+  - 以后的战法数据程序集（03 §7）如果也要确定性，加上同一个程序集标记即可。

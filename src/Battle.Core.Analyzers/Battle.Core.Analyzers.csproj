@@ -1,0 +1,46 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Roslyn analyzer that turns the Battle.Core determinism rules into compile errors.
+    It runs in two hosts:
+      - dotnet builds, through the ProjectReference in Battle.Core.csproj;
+      - Unity, through the copy in src/Battle.Core/Analyzers/ (labelled RoslynAnalyzer in its .meta).
+    netstandard2.0 + Microsoft.CodeAnalysis 4.3 is what the Unity 6 compiler (Roslyn 4.3) loads; do not raise either.
+    The analyzer only reports in assemblies marked [assembly: EnforceDeterminism], so Unity assemblies
+    that merely reference Battle.Core are left alone.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>Automatic.Battle.Analyzers</RootNamespace>
+    <AssemblyName>Automatic.Battle.Core.Analyzers</AssemblyName>
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <!-- Internal analyzer, no release tracking. -->
+    <NoWarn>$(NoWarn);RS2008</NoWarn>
+    <!--
+      Byte-identical output for identical sources, whatever the configuration or checkout path,
+      so the Unity copy below only changes in git when the analyzer really changed.
+    -->
+    <Deterministic>true</Deterministic>
+    <Optimize>true</Optimize>
+    <DebugType>none</DebugType>
+    <PathMap>$(MSBuildProjectDirectory)=/_/src/Battle.Core.Analyzers</PathMap>
+    <GenerateAssemblyConfigurationAttribute>false</GenerateAssemblyConfigurationAttribute>
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+    <UnityAnalyzerCopy>$(MSBuildProjectDirectory)\..\Battle.Core\Analyzers\$(AssemblyName).dll</UnityAnalyzerCopy>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.3.1" PrivateAssets="all" />
+  </ItemGroup>
+
+  <!-- Keep the DLL Unity loads in sync with the source; rewrite it only when the bytes differ. -->
+  <Target Name="CopyAnalyzerForUnity" AfterTargets="Build">
+    <GetFileHash Files="$(TargetPath)">
+      <Output TaskParameter="Hash" PropertyName="_BuiltHash" />
+    </GetFileHash>
+    <GetFileHash Files="$(UnityAnalyzerCopy)" Condition="Exists('$(UnityAnalyzerCopy)')">
+      <Output TaskParameter="Hash" PropertyName="_CopyHash" />
+    </GetFileHash>
+    <Copy SourceFiles="$(TargetPath)" DestinationFiles="$(UnityAnalyzerCopy)" Condition="'$(_BuiltHash)' != '$(_CopyHash)'" />
+  </Target>
+</Project>

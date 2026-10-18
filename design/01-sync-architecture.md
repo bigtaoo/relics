@@ -72,6 +72,23 @@ BattleRound {
 
 - 客户端在战斗结束时上报状态哈希。哈希与服务端不一致时记录日志并上报，**结果始终以服务端为准**，不需要 funny 的空闲客户端仲裁机制。
 - 黄金回放测试：固定若干组「快照 + 种子 → 最终哈希」，任何改变战斗结果的改动都必须升 `EngineVersion` 并更新这些期望值。
+- 编译期检查（ADR-012）：分析器 `src/Battle.Core.Analyzers` 在 Battle.Core 里把不确定的写法报成编译错误，dotnet 和 Unity 都生效：
+
+  | 规则 | 禁止 |
+  |---|---|
+  | DET001 | `float` / `double` / `decimal`：类型、字面量、隐式转换成浮点传给框架方法 |
+  | DET002 | `System.Math`、`MathF` |
+  | DET003 | `DateTime`、`DateTimeOffset`、`TimeZoneInfo`、`Environment`、`Stopwatch` |
+  | DET004 | `System.Random`、`RandomNumberGenerator` |
+  | DET005 | `Guid` |
+  | DET006 | `System.Threading*`、`System.Timers`、`async` / `await`、`lock`、`volatile` |
+  | DET007 | 遍历 `Dictionary` / `HashSet` 及其 `Keys` / `Values`、`IDictionary`、`ISet`、并发和不可变的字典与集合：`foreach`、LINQ、传给 `List` 构造或 `string.Join`、`GetEnumerator`、`CopyTo`。`SortedDictionary` / `SortedSet` 可以 |
+  | DET008 | `object` / `ValueType` / `string` 的 `GetHashCode`、带字符串参数的 `GetHashCode`（`StringComparer`）、`System.HashCode` |
+  | DET009 | `[DeterminismExempt]` 没写理由 |
+
+  - 所有规则都是错误且不可配置，`#pragma warning disable`、`NoWarn`、`.editorconfig` 都压不掉。
+  - 唯一的例外方式是在外层成员、局部函数或类型上加 `[DeterminismExempt("理由")]`。每个豁免都要列在下面，`DeterminismTests.ExemptionsAreTheReviewedList` 会对照检查。
+  - 当前豁免：无。
 
 ## 7. 待定
 

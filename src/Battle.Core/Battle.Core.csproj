@@ -13,4 +13,9 @@
   <ItemGroup>
     <InternalsVisibleTo Include="Battle.Core.Tests" />
   </ItemGroup>
+  <ItemGroup>
+    <!-- Determinism rules as compile errors (Unity loads the copy in Analyzers/ instead). -->
+    <ProjectReference Include="..\Battle.Core.Analyzers\Battle.Core.Analyzers.csproj"
+                      OutputItemType="Analyzer" ReferenceOutputAssembly="false" />
+  </ItemGroup>
 </Project>
