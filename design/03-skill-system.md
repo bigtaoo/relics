@@ -65,3 +65,9 @@
 
 Core 只输出**事件流**，例如「A 对 B 发动战法 X」「B 受到 120 点兵刃伤害」「B 获得护盾」，每条事件带 tick。
 Unity 演出层只消费事件，不反向调用 Core。
+
+**第一版（2026-10-18，ADR-014）**：`src/Battle.Core/Turn/` 的 `TurnBattle` 是一场最小的回合制战斗，在三战规则（02）落地前先顶上，用来验证「Core 驱动演出」这条路。
+- 输出 `TurnEvent` 列表，按产生顺序排列，tick 单调不减。种类：`HandTrigger`（牌型发动，Amount = 加伤百分比）、`AttackStart` / `SkillCast`（行动开始；SkillCast 的 Amount = 目标数）、`AttackHit` / `SkillHit`（命中，每个目标一条）、`Damage`（Amount、Crit）、`Death`、`BattleEnd`（Amount = 胜方，2 = 平局）。
+- 每个行动的时长和命中时刻都在 `TurnTiming` 表里（普攻 16 tick、第 7 tick 命中；战法 27 tick、第 9 tick 命中；牌型 25 tick；间隔 2 tick）。演出只能在这个时长里伸缩，不能加长。
+- 演出层先把整场跑完（`Run()`），再把事件按行动分组编排；追帧 / 观战用 `RunTo(tick)` 拿到那一刻的血量和存活，不经过演出。测试锁定「先追到任意 tick 再跑完」与「从头跑完」的事件和哈希完全一致。
+- 战斗内容（阵容、数值）不在 Core 里（§7）：Demo 的阵容在客户端热更代码 `BattleLineup.cs`。

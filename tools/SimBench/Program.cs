@@ -2,22 +2,24 @@ using System.Diagnostics;
 using Automatic.Battle.Sim;
 
 // Battle logic stress test on the server runtime (design/08 §2).
-// usage: dotnet run -c Release --project tools/SimBench [-- --seeds N --seconds S]
+// usage: dotnet run -c Release --project tools/SimBench [-- --seeds N --seconds S --rate HZ]
 var seeds = Arg("--seeds", 20);
 var seconds = Arg("--seconds", 10);
-Console.WriteLine($".NET {Environment.Version}, {Environment.ProcessorCount} logical cores, {(Debugger.IsAttached ? "debugger" : "no debugger")}");
+// Logic tick rate (ADR-014): the same battles at another rate, durations and speeds rescaled.
+var rate = Arg("--rate", 30);
+Console.WriteLine($".NET {Environment.Version}, {Environment.ProcessorCount} logical cores, {(Debugger.IsAttached ? "debugger" : "no debugger")}, {rate} Hz");
 Console.WriteLine();
 Console.WriteLine("scenario          | ticks | units avg/peak/made | ms/battle median (p95) | worst tick ms | events | alloc KB | winners 0/1/draw | hash seed 1");
 
 var cases = new List<Func<uint, SimConfig>>(SimConfigAll());
 cases.Add(s => With(SimConfig.Crowd300(s), "crowd300 no events", c => c.RecordEvents = false));
 cases.Add(s => With(SimConfig.Crowd300(s), "crowd300 no grid", c => c.UseGrid = false));
-foreach (var make in cases) Report(make, seeds);
+foreach (var make in cases) Report(s => AtRate(make(s), rate), seeds);
 
 Console.WriteLine();
 Console.WriteLine("Capacity, summon300 (the heaviest: about 250 units the whole 30 s) without events (the server needs no event stream):");
-var single = Throughput(1, seconds / 2.0);
-var all = Throughput(Environment.ProcessorCount, seconds);
+var single = Throughput(1, seconds / 2.0, rate);
+var all = Throughput(Environment.ProcessorCount, seconds, rate);
 Console.WriteLine($"  1 thread: {single:F1} battles/s; {Environment.ProcessorCount} threads: {all:F1} battles/s ({all / Environment.ProcessorCount:F1} per thread)");
 // 8 players: 4 battles a round; a round is 20 s preparation + 30 s battle.
 Console.WriteLine($"  if every battle were a summon battle: {single * 50 / 4:F0} matches per core (1 thread), {all * 50 / 4:F0} matches on this machine");
@@ -26,6 +28,12 @@ static IEnumerable<Func<uint, SimConfig>> SimConfigAll() => new Func<uint, SimCo
 {
     SimConfig.Duel16, SimConfig.Summon300, SimConfig.Crowd300, SimConfig.Crowd500,
 };
+
+static SimConfig AtRate(SimConfig c, int rate)
+{
+    c.TickRate = rate;
+    return c;
+}
 
 static SimConfig With(SimConfig c, string name, Action<SimConfig> change)
 {
@@ -73,7 +81,7 @@ static void Report(Func<uint, SimConfig> make, int seeds)
                       (again.Hash() == hash1 ? "" : "  NOT DETERMINISTIC"));
 }
 
-static double Throughput(int threads, double seconds)
+static double Throughput(int threads, double seconds, int rate)
 {
     long done = 0;
     var until = Stopwatch.GetTimestamp() + (long)(seconds * Stopwatch.Frequency);
@@ -84,6 +92,7 @@ static double Throughput(int threads, double seconds)
         {
             var c = SimConfig.Summon300(seed++);
             c.RecordEvents = false;
+            c.TickRate = rate;
             new CrowdBattle(c).Run();
             Interlocked.Increment(ref done);
         }

@@ -28,8 +28,13 @@ modules later), Visual Studio with the *Desktop development with C++* workload (
 
 `Relics.exe` (and Play on `Assets/Boot/Boot.unity` in the editor) starts the playable UI slice:
 the board in the preparation phase with the shop. Click the glowing card to play the hu show, the
-battle start and a scripted battle of about 16 s (`BattleScript.cs` / `BattleShow.cs`, art/fx/README.md
-§4); click again or press R to start over, Esc quits. With the CDN running (below):
+battle start and a battle of about 16 s that Battle.Core runs (`TurnBattle`, lineup in
+`BattleLineup.cs`, staged by `BattleShow.cs`, art/fx/README.md §4.1); click again or press R to
+start over, Esc quits. `-seed N` picks the battle (default: the first seed with the skill, two
+crits on attacks and a win, logged as `[Battle] seed ...`). `-seek T` jumps the playing battle to tick T (10 per
+second) at `-seekat S` seconds into it (default 3, 0 joins at the start); J jumps 5 s ahead. A
+jump shows the core's state at once and picks up at the next action's start. With the CDN
+running (below):
 
 ```bash
 artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 540 -screen-height 960
@@ -38,7 +43,8 @@ artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 540 -screen-he
 `-autoplay <dir>` runs it by itself and saves screenshots along the timeline as raw RGB24 (the
 player has no image encoder module), then quits. To check that something moves, diff two
 frames of the same phase (e.g. `0.0` and `0.3`, both before the click lands). The battle shots
-are taken at each act's blow, the hand going off, and the end.
+(`b<seconds>`, battle time) are taken at each action's blow, the hand going off, and the end;
+with `-seek` also right after the jump (`seek<tick>`).
 
 Hot code may only call engine API the shell kept: `Assets/Boot/link.xml` preserves the engine
 modules hot code is expected to use (design/07 §4). A `MissingMethodException` in the player log

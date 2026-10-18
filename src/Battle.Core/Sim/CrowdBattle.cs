@@ -31,7 +31,6 @@ namespace Automatic.Battle.Sim
     /// </summary>
     public sealed partial class CrowdBattle
     {
-        public const int TicksPerSecond = 30;
         private const int RetargetTicks = 15;
 
         public readonly SimConfig Config;
@@ -54,6 +53,8 @@ namespace Automatic.Battle.Sim
         private readonly int[] summons = new int[2];
         private readonly List<int> near = new List<int>(256);
         private readonly FP width, height, maxRadius, edge;
+        /// <summary>The 30 Hz durations below at the config's tick rate; speeds per tick grow by speedScale.</summary>
+        private readonly int retargetTicks, burnTicks, burnEvery, stunTicks, attackUpTicks, speedScale;
 
         public CrowdBattle(SimConfig config)
         {
@@ -65,6 +66,12 @@ namespace Automatic.Battle.Sim
             height = FP.FromInt(config.Height);
             maxRadius = FP.FromRatio(30, 100);
             edge = FP.FromRatio(1, 100);
+            retargetTicks = config.Ticks(RetargetTicks);
+            burnTicks = config.Ticks(BurnTicks);
+            burnEvery = config.Ticks(BurnEvery);
+            stunTicks = config.Ticks(StunTicks);
+            attackUpTicks = config.Ticks(AttackUpTicks);
+            speedScale = 30 / config.TickRate;
             for (int side = 0; side < 2; side++)
             {
                 for (int i = 0; i < SimConfig.Heroes.Length; i++)
@@ -75,9 +82,9 @@ namespace Automatic.Battle.Sim
                     var u = Add(SimConfig.Heroes[i], side, x, Mirror(side, y), false);
                     if (i >= 4 && i - 4 < config.SummonersPerSide)
                     {
-                        u.SummonEvery = config.SummonEvery;
+                        u.SummonEvery = config.Ticks(config.SummonEvery);
                         u.SummonBatch = config.SummonBatch;
-                        u.NextSummonAt = 15 + (i - 4) * 5;
+                        u.NextSummonAt = config.Ticks(15 + (i - 4) * 5);
                     }
                 }
                 // Initial summons on a lattice over the side's half, slightly jittered.
@@ -115,7 +122,7 @@ namespace Automatic.Battle.Sim
             if (total > PeakAlive) PeakAlive = total;
             UnitTicks += total;
             if (alive[0] == 0 || alive[1] == 0) Winner = alive[0] == alive[1] ? 2 : alive[0] == 0 ? 1 : 0;
-            else if (Tick >= Config.MaxTicks) Winner = TimeoutWinner();
+            else if (Tick >= Config.Ticks(Config.MaxTicks)) Winner = TimeoutWinner();
         }
 
         private void Act(SimUnit u)
@@ -133,7 +140,7 @@ namespace Automatic.Battle.Sim
             {
                 t = NearestEnemy(u);
                 u.Target = t == null ? -1 : t.Id;
-                u.RetargetAt = Tick + RetargetTicks;
+                u.RetargetAt = Tick + retargetTicks;
             }
             if (t == null) return;
             var dx = t.X - u.X;
@@ -251,10 +258,10 @@ namespace Automatic.Battle.Sim
             var u = new SimUnit
             {
                 Id = Units.Count, Side = side, IsSummon = summon, X = x, Y = y,
-                Radius = FP.FromRatio(t.RadiusHundredths, 100), Speed = FP.FromRatio(t.SpeedHundredths, 100),
+                Radius = FP.FromRatio(t.RadiusHundredths, 100), Speed = FP.FromRatio(t.SpeedHundredths, 100) * speedScale,
                 Hp = FP.FromInt(t.Hp), MaxHp = FP.FromInt(t.Hp), Atk = FP.FromInt(t.Atk), Def = FP.FromInt(t.Def),
                 Range = SimConfig.Tenths(t.RangeTenths), CritPercent = t.CritPercent,
-                AttackInterval = t.AttackInterval, AttackReadyAt = Tick + t.AttackInterval / 2,
+                AttackInterval = Config.Ticks(t.AttackInterval), AttackReadyAt = Tick + Config.Ticks(t.AttackInterval) / 2,
                 ManaMax = t.ManaMax, Skill = t.Skill, SkillPower = FP.FromPercent(t.SkillPercent),
                 SkillRadius = SimConfig.Tenths(t.SkillRadiusTenths),
             };

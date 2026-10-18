@@ -16,9 +16,12 @@ namespace Automatic.Game
     /// with the shop HUD over it. Clicking the glowing card plays the hu show (cards, tiles, seal,
     /// with the hand-formed effect on the board: only formed pieces come alive, 04 §6) and then
     /// the battle start (tray away, camera to the whole table, the opponent arrives), then a short
-    /// scripted battle (BattleShow: attacks, the hand going off, a skill, deaths). Click or R
-    /// afterwards to start over; -autoplay dir runs it by itself and saves screenshots. Everything
-    /// is loaded from the resource package; the scene and the prefab carry no game scripts.
+    /// battle run by Battle.Core (BattleShow: attacks, the hand going off, a skill, deaths). Click or
+    /// R afterwards to start over; -autoplay dir runs it by itself and saves screenshots. -seed N
+    /// picks the battle (default BattleLineup.DemoSeed); -seek T jumps the playing battle to tick T
+    /// at -seekat S seconds into it (default 3; 0 joins right at the start); J jumps 5 s ahead.
+    /// Everything is loaded from the resource package; the scene and the prefab carry no game scripts.
+    /// The timeline runs on unscaled time: the battle's hit stop must not move it.
     /// </summary>
     public sealed class ShopDemo : MonoBehaviour
     {
@@ -27,6 +30,10 @@ namespace Automatic.Game
         private const int HuCard = 2;
         /// <summary>The battle (BattleShow) starts once the battle start has settled.</summary>
         private const float BattleAt = HuShowUi.Finish + 0.2f;
+
+        private static readonly int seekTick = int.TryParse(LaunchArgs.After("-seek"), out var tick) ? tick : -1;
+        private static readonly float seekAt = float.TryParse(LaunchArgs.After("-seekat"), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out var at) ? at : 3;
+        private static readonly uint seed = uint.TryParse(LaunchArgs.After("-seed"), out var s) ? s : BattleLineup.DemoSeed();
 
         private sealed class Unit
         {
@@ -59,6 +66,11 @@ namespace Automatic.Game
         private Rect freeAt;
         private Vector2Int reported;
         private BattleShow battle;
+        /// <summary>Battle time minus time since the battle started: moved by seeking.</summary>
+        private float shift;
+        private bool jumped;
+        /// <summary>Where the last jump joined the battle: the actions before it are not played.</summary>
+        private float joinedAt;
 
         public static void Run(ResourcePackage package)
         {
@@ -96,22 +108,29 @@ namespace Automatic.Game
             yield return Capture("0.0");
             yield return new WaitForSeconds(0.2f);
             Click();
-            // Battle: each act's blow (attack contact, skill impact), the hand going off, the end.
-            var starts = BattleScript.Starts();
-            var battleShots = BattleScript.Acts.Select((a, i) => BattleAt + starts[i] + a.Kind switch
-            {
-                ActKind.Attack => 0.76f,
-                ActKind.Skill => 0.9f,
-                _ => 1.2f,
-            }).Append(BattleAt + starts[^1] + 0.6f);
-            shots = shots.Concat(battleShots).ToArray();
+            var count = shots.Length + 1;
             foreach (var at in shots)
             {
-                while (Time.time - clickedAt + HuShowUi.Press < at) yield return null;
+                while (Clock < at) yield return null;
                 yield return Capture(at.ToString("F1"));
             }
+            // The battle by its own clock: each action's blow, the hand going off, the result; with
+            // -seek also the moment after the jump.
+            foreach (var h in battle.Highlights)
+            {
+                if (seekTick >= 0 && !jumped && h >= seekAt)
+                {
+                    while (!jumped) yield return null;
+                    yield return Capture($"seek{seekTick}");
+                    count++;
+                }
+                if (h < BattleTime || h < joinedAt) continue;
+                while (BattleTime < h) yield return null;
+                yield return Capture($"b{h:F1}");
+                count++;
+            }
             yield return new WaitForSeconds(0.5f);
-            Debug.Log($"[Demo] autoplay done, {shots.Length + 1} screenshots in {autoplay}");
+            Debug.Log($"[Demo] autoplay done, {count} screenshots in {autoplay}");
             Application.Quit();
         }
 
@@ -198,10 +217,13 @@ namespace Automatic.Game
 
             BattleShow.Reset();
             battle = new BattleShow(cam, units.Select(u => u.Root), hand.Select(u => u.Root), name => prefabs[name],
-                new BattlePops((RectTransform)hud, cam, shop), shop.Find("RoundBar/Round").GetComponent<TextMeshProUGUI>());
+                new BattlePops((RectTransform)hud, cam, shop), shop.Find("RoundBar/Round").GetComponent<TextMeshProUGUI>(), seed);
             events.Clear();
             fired = 0;
             clickedAt = -1;
+            shift = 0;
+            jumped = false;
+            joinedAt = 0;
             freeAt = default;
             Schedule();
         }
@@ -237,13 +259,27 @@ namespace Automatic.Game
                 foreach (var m in markers) m.gameObject.SetActive(true);
             }));
             events.Add((BattleAt, () => battle.Begin()));
-            events.Add((BattleAt + battle.End + 1.2f, () => hint.gameObject.SetActive(true)));
             events.Sort((x, y) => x.At.CompareTo(y.At));
         }
 
         private void Click()
         {
-            if (clickedAt < 0) clickedAt = Time.time;
+            if (clickedAt < 0) clickedAt = Time.unscaledTime;
+        }
+
+        /// <summary>Seconds since the click (plus the press), unscaled.</summary>
+        private float Clock => clickedAt < 0 ? 0 : Time.unscaledTime - clickedAt + HuShowUi.Press;
+
+        /// <summary>The battle's clock, negative before it starts.</summary>
+        private float BattleTime => clickedAt < 0 ? -BattleAt : Clock - BattleAt + shift;
+
+        /// <summary>Jumps the playing battle to battle time `b` (BattleShow.SeekTo).</summary>
+        private void Jump(float b)
+        {
+            var from = BattleTime;
+            joinedAt = battle.SeekTo(b);
+            shift += b - from;
+            jumped = true;
         }
 
         private void Update()
@@ -280,7 +316,7 @@ namespace Automatic.Game
                 huCentre.z = 0;
             }
 
-            var t = clickedAt < 0 ? 0 : Time.time - clickedAt + HuShowUi.Press;
+            var t = Clock;
             while (fired < events.Count && events[fired].At <= t) events[fired++].Do();
             ui.Pose(t, Time.time, huCentre);
 
@@ -295,8 +331,11 @@ namespace Automatic.Game
             cam.transform.position = Vector3.Lerp(prepPos, battlePos, HuShowUi.Smooth(Mathf.InverseLerp(HuShowUi.MoveStart, HuShowUi.MoveEnd, t)));
             if (t >= BattleAt)
             {
-                battle.Tick(t - BattleAt);
+                if (seekTick >= 0 && !jumped && BattleTime >= seekAt) Jump((float)seekTick / Battle.Turn.TurnTiming.TicksPerSecond);
+                if (Input.GetKeyDown(KeyCode.J)) Jump(BattleTime + 5);
+                battle.Tick(BattleTime);
                 cam.transform.position += battle.CameraOffset(cam.transform.position);
+                if (BattleTime >= battle.End + 1.2f && !hint.gameObject.activeSelf) hint.gameObject.SetActive(true);
             }
             for (var i = 0; i < enemies.Count; i++)
             {

@@ -1,26 +1,29 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Automatic.Battle.Turn;
 using UnityEngine;
 
 namespace Automatic.Game
 {
     /// <summary>
-    /// The battle presentation slice (design/08 §1): plays BattleScript on the board after the
-    /// battle start, as the presentation layer will play the core's event stream. Each act is
-    /// staged inside its fixed length: pieces pounce on their target and back, claws and flames
-    /// land with a hit stop, a camera shake and a damage number; dying artifacts shatter; the
-    /// formed hand lights up again and buffs the board; the skill pushes the camera in.
-    /// Time is the battle's own clock (seconds from its start), driven by ShopDemo.
+    /// The battle presentation slice (design/08 §1): runs the demo battle (BattleLineup) in
+    /// Battle.Core and stages its event stream on the board. Every action is staged inside the
+    /// length the core gives it (TurnTiming): pieces pounce on their target and back, claws and
+    /// flames land at the core's hit tick with a hit stop, a camera shake and a damage number; dying
+    /// artifacts shatter; the formed hand lights up again and buffs the board; the skill pushes the
+    /// camera in. Time is the battle's own clock (seconds from its start, unscaled: the hit stop
+    /// freezes animators and particles but never moves the timeline), driven by ShopDemo.
+    /// SeekTo joins the battle at any time, with the state the core fast-forwards to.
     /// </summary>
-    public sealed class BattleShow
+    public sealed partial class BattleShow
     {
         public const string Charge = "fx_zheng_charge", Bolt = "fx_zheng_bolt", Impact = "fx_zheng_impact";
         public const string Claw = "fx_claw", Shatter = "fx_shatter", Buff = "fx_buff", Dust = "fx_dust";
         public const string HuPiece = "fx_hu_piece", HuLink = "fx_hu_link";
         public static readonly string[] Prefabs = { Charge, Bolt, Impact, Claw, Shatter, Buff, Dust };
 
-        private const float BarWidth = 0.56f, Turn = 40, ImpactAt = 0.34f, Release = 0.5f, Flight = 0.35f;
+        private const float BarWidth = 0.56f, Turn = 40;
         /// <summary>The acting ring breathes up to this much wider, this often a second (art/board/README.md, portrait readability).</summary>
         private const float RingPulse = 0.25f, RingRate = 2;
         private static readonly int RimColor = Shader.PropertyToID("_RimColor"), RimPower = Shader.PropertyToID("_RimPower"), RimStrength = Shader.PropertyToID("_RimStrength");
@@ -45,15 +48,26 @@ namespace Automatic.Game
         private readonly Transform ring;
         private readonly List<(float At, Action Do)> events = new();
         private readonly List<(float From, float To, Action<float> Pose)> motions = new();
+        private readonly List<GameObject> spawned = new();
         private readonly MaterialPropertyBlock flash = new();
         private int fired;
-        private float stopUntil = -1, shakeAt = -1, shakeAmp, push;
+        private float stopUntil = -1, shakeAt = -1, shakeAmp, push, joinAt;
         private Vector3 focus;
+
+        private readonly TurnSetup setup;
+        private readonly TurnBattle whole;
+        /// <summary>The piece of each core unit (TurnBattle.Units order).</summary>
+        private readonly Piece[] actors;
+        private readonly List<float> starts = new();
+        private readonly List<float> highlights = new();
 
         /// <summary>When the battle is over (seconds from its start).</summary>
         public readonly float End;
+        public int Winner => whole.Winner;
+        /// <summary>Moments worth a screenshot: each action's blow, the hand going off, the result.</summary>
+        public IReadOnlyList<float> Highlights => highlights;
 
-        public BattleShow(Camera cam, IEnumerable<Transform> units, IEnumerable<Transform> handInOrder, Func<string, GameObject> prefab, BattlePops pops, TMPro.TextMeshProUGUI round)
+        public BattleShow(Camera cam, IEnumerable<Transform> units, IEnumerable<Transform> handInOrder, Func<string, GameObject> prefab, BattlePops pops, TMPro.TextMeshProUGUI round, uint seed)
         {
             this.cam = cam;
             this.prefab = prefab;
@@ -72,18 +86,26 @@ namespace Automatic.Game
             }
             hand = handInOrder.Select(r => pieces.First(p => p.Root == r)).ToList();
             ring = pieces.Select(p => p.Root.Find("ActiveRing")).FirstOrDefault(r => r != null);
-            foreach (var (cell, health) in BattleScript.Health)
-                if (board.TryGetValue(cell, out var p))
-                {
-                    p.Health = p.Shown = health / 1000f;
-                    Bar(p);
-                }
-            var starts = BattleScript.Starts();
-            for (var i = 0; i < BattleScript.Acts.Length; i++) Stage(BattleScript.Acts[i], starts[i]);
-            End = starts[^1];
-            events.Add((End + 0.2f, () => pops.Banner("胜", 230, BattlePops.Crit, 60, Now, 2.6f)));
+
+            setup = BattleLineup.Setup(seed);
+            whole = new TurnBattle(setup);
+            whole.Run();
+            actors = whole.Units.Select(u => board[BattleLineup.CellOf(u)]).ToArray();
+            for (var i = 0; i < actors.Length; i++)
+            {
+                actors[i].Health = actors[i].Shown = (float)setup.Units[i].Hp / setup.Units[i].MaxHp;
+                Bar(actors[i]);
+            }
+            End = Seconds(whole.Events[^1].Tick);
+            StageAll();
+            var result = whole.Winner == 0 ? "胜" : whole.Winner == 1 ? "败" : "平";
+            events.Add((End + 0.2f, () => pops.Banner(result, 230, BattlePops.Crit, 60, Now, 2.6f)));
+            highlights.Add(End + 0.6f);
             events.Sort((x, y) => x.At.CompareTo(y.At));
+            Debug.Log($"[Battle] seed {seed}: {whole.Events.Count} core events, {starts.Count} actions, winner {whole.Winner} at tick {whole.Events[^1].Tick} ({End:F1} s), hash {whole.Hash():x16}");
         }
+
+        private static float Seconds(int tick) => (float)tick / TurnTiming.TicksPerSecond;
 
         /// <summary>Called once the pieces stand where the battle starts (the opponent has landed).</summary>
         public void Begin()
@@ -108,7 +130,7 @@ namespace Automatic.Game
             }
             while (fired < events.Count && events[fired].At <= b) events[fired++].Do();
             foreach (var (from, to, pose) in motions)
-                if (b >= from && b < to + 0.1f) pose(Mathf.Clamp01((b - from) / (to - from)));
+                if (from >= joinAt && b >= from && b < to + 0.1f) pose(Mathf.Clamp01((b - from) / (to - from)));
             foreach (var p in pieces.Where(p => p.Fill != null))
             {
                 p.Shown = Mathf.MoveTowards(p.Shown, p.Health, Time.deltaTime * 1.5f);
@@ -123,6 +145,48 @@ namespace Automatic.Game
             pops.Update(Now);
             // (HuShowUi sets the round bar to the battle every frame.)
             if (b >= End && round != null) round.text = round.text.Replace("战斗", "战斗结束");
+        }
+
+        /// <summary>
+        /// Joins the battle at time `b` (spectating, reconnecting, or jumping while it plays; 01 §4).
+        /// An action in flight is not shown half-way: the presentation picks up at the next action's
+        /// start, with the state the core fast-forwards to (RunTo, no presentation). Returns that time.
+        /// </summary>
+        public float SeekTo(float b)
+        {
+            joinAt = starts.FirstOrDefault(s => s >= b - 0.001f);
+            if (joinAt < b - 0.001f) joinAt = End;
+            var tick = Mathf.RoundToInt(joinAt * TurnTiming.TicksPerSecond);
+            var state = new TurnBattle(setup);
+            state.RunTo(tick);
+
+            Reset();
+            stopUntil = shakeAt = -1;
+            push = 0;
+            MoveRing(null);
+            pops.Clear();
+            foreach (var go in spawned.Where(go => go != null)) UnityEngine.Object.Destroy(go);
+            spawned.Clear();
+            foreach (var p in pieces)
+            {
+                p.Model.SetPositionAndRotation(p.Home, p.Rest);
+                p.Model.localScale = p.Scale;
+                Flash(p, false);
+            }
+            for (var i = 0; i < actors.Length; i++)
+            {
+                var p = actors[i];
+                var alive = state.Units[i].Alive;
+                p.Health = p.Shown = (float)state.Units[i].Hp / state.Units[i].MaxHp;
+                Bar(p);
+                Show(p, alive);
+                if (alive) Play(p, "idle", 0.1f);
+            }
+            fired = events.FindIndex(e => e.At >= joinAt);
+            if (fired < 0) fired = events.Count;
+            var hp = string.Join(" ", state.Units.Select(u => u.Hp));
+            Debug.Log($"[Battle] seek to {b:F2} s: joins at tick {tick} ({joinAt:F1} s), core ran {state.Events.Count} events, hp {hp}");
+            return joinAt;
         }
 
         private static void Bar(Piece p)
@@ -147,197 +211,27 @@ namespace Automatic.Game
             return offset;
         }
 
-        /// <summary>Puts the time scale back (the demo restarts mid hit stop).</summary>
+        /// <summary>Puts the time scale back (the demo restarts or seeks mid hit stop).</summary>
         public static void Reset() => Time.timeScale = 1;
 
-        // ---- Acts ---------------------------------------------------------------------------
-
-        private void Stage(Act act, float s)
-        {
-            var actor = board[(act.Actor.Side, act.Actor.Row, act.Actor.Col)];
-            if (act.Kind != ActKind.Hand) events.Add((s, () => MoveRing(actor)));
-            switch (act.Kind)
-            {
-                case ActKind.Attack: Attack(actor, act.Blows[0], s); break;
-                case ActKind.Skill: Skill(actor, act, s); break;
-                default: HandGoesOff(s); break;
-            }
-        }
-
-        /// <summary>Pounce onto the target (0.4 s), claw and bite (contact 0.34 s in), pounce back.</summary>
-        private void Attack(Piece a, Blow blow, float s)
-        {
-            var target = board[(blow.Target.Side, blow.Target.Row, blow.Target.Col)];
-            Vector3 home = default, strike = default;
-            events.Add((s, () =>
-            {
-                home = a.Home;
-                var dir = Flat(target.Root.position - a.Root.position);
-                strike = target.Home - dir * 0.6f + Vector3.up * (home.y - target.Home.y);
-                Spawn(Dust, a.Root.position);
-            }));
-            Leap(a, () => home, () => strike, s);
-            events.Add((s + 0.4f, () =>
-            {
-                Play(a, "attack");
-                Spawn(Dust, strike - Vector3.up * strike.y);
-            }));
-            var contact = s + 0.4f + ImpactAt;
-            events.Add((contact, () =>
-            {
-                var dir = Flat(target.Root.position - a.Root.position);
-                var fx = Spawn(Claw, target.Home + Vector3.up * 0.25f);
-                fx.transform.rotation = Quaternion.FromToRotation(Vector3.right, dir);
-            }));
-            Struck(target, blow, contact, false);
-            Leap(a, () => strike, () => home, s + 1.05f);
-            events.Add((s + 1.45f, () =>
-            {
-                Spawn(Dust, home - Vector3.up * home.y);
-                Play(a, "idle", 0.2f);
-            }));
-            motions.Add((s + 1.45f, s + 1.6f, u => a.Model.rotation = Quaternion.Slerp(a.Model.rotation, a.Rest, u)));
-        }
-
-        /// <summary>
-        /// Five-tail flames: the camera pushes in, the caster rears up over a sigil, one bolt leaves
-        /// each tail tip at the release and fans out onto the targets (2 / 1 / 2 bolts).
-        /// </summary>
-        private void Skill(Piece caster, Act act, float s)
-        {
-            var targets = act.Blows.Select(b => board[(b.Target.Side, b.Target.Row, b.Target.Col)]).ToArray();
-            events.Add((s, () =>
-            {
-                focus = (caster.Home + targets.Aggregate(Vector3.zero, (sum, t) => sum + t.Home) / targets.Length) / 2 + Vector3.up * 0.3f;
-                Play(caster, "cast");
-                Spawn(Charge, caster.Root.position);
-                pops.Callout(() => caster.Model.position, act.Name, Now);
-            }));
-            motions.Add((s, s + 0.45f, u => push = u));
-            motions.Add((s + 1.9f, s + 2.45f, u => push = 1 - u));
-            var which = new[] { 0, 0, 1, 2, 2 };
-            for (var t = 1; t <= 5; t++)
-            {
-                var tail = t;
-                var target = targets[which[t - 1]];
-                var go = default(GameObject);
-                Vector3 from = default, control = default, to = default;
-                var launch = s + Release + (t - 1) * 0.03f;
-                events.Add((launch, () =>
-                {
-                    from = caster.Model.GetComponentsInChildren<Transform>().First(b => b.name == $"tail{tail}.4").position;
-                    to = target.Home + Vector3.up * 0.3f;
-                    var right = Vector3.Cross(Vector3.up, to - from).normalized;
-                    control = (from + to) / 2 + Vector3.up * 0.8f + right * ((tail - 3) * 0.4f);
-                    go = Spawn(Bolt, from);
-                }));
-                motions.Add((launch, launch + Flight, u =>
-                {
-                    if (go != null) go.transform.position = Vector3.Lerp(Vector3.Lerp(from, control, u), Vector3.Lerp(control, to, u), u);
-                }));
-            }
-            for (var i = 0; i < targets.Length; i++)
-            {
-                var target = targets[i];
-                var last = Array.LastIndexOf(which, i);
-                var hit = s + Release + last * 0.03f + Flight;
-                events.Add((hit, () => Spawn(Impact, target.Root.position)));
-                Struck(target, act.Blows[i], hit, true);
-            }
-            events.Add((s + 1.6f, () => Play(caster, "idle", 0.25f)));
-        }
-
-        /// <summary>
-        /// The formed hand goes off: its name across the screen, each piece hops inside a light
-        /// pillar in turn, links redraw the hand's shape, then every piece on the board is buffed.
-        /// </summary>
-        private void HandGoesOff(float s)
-        {
-            events.Add((s, () =>
-            {
-                MoveRing(null);
-                pops.Banner($"{BattleScript.HandName} · 发动", 92, BattlePops.Crit, 250, Now, 2.1f);
-            }));
-            events.Add((s + 0.3f, () => pops.Banner(BattleScript.HandEffect, 50, BattlePops.Weapon, 165, Now, 1.8f)));
-            for (var i = 0; i < hand.Count; i++)
-            {
-                var p = hand[i];
-                var at = s + 0.2f + 0.1f * i;
-                events.Add((at, () => Spawn(HuPiece, p.Root.position)));
-                motions.Add((at, at + 0.4f, u => p.Model.position = p.Home + Vector3.up * 0.22f * Mathf.Sin(u * Mathf.PI)));
-                if (i == 0) continue;
-                var prev = hand[i - 1];
-                events.Add((at + 0.05f, () => Link(prev.Root.position, p.Root.position)));
-            }
-            events.Add((s + 0.25f + 0.1f * hand.Count, () => Link(hand[^1].Root.position, hand[0].Root.position)));
-            var centre = hand.Aggregate(Vector3.zero, (sum, p) => sum + p.Home) / hand.Count;
-            var mine = board.Where(kv => kv.Key.Item1 < 0).Select(kv => kv.Value).OrderBy(p => (p.Home - centre).sqrMagnitude).ToList();
-            for (var k = 0; k < mine.Count; k++)
-            {
-                var p = mine[k];
-                events.Add((s + 1.0f + 0.04f * k, () =>
-                {
-                    if (p.Model.gameObject.activeSelf) Spawn(Buff, p.Root.position);
-                }));
-            }
-        }
-
         // ---- Pieces -------------------------------------------------------------------------
-
-        /// <summary>The blow lands at `at`: hit stop, shake, number, health, flash and squash; or death.</summary>
-        private void Struck(Piece target, Blow blow, float at, bool skill)
-        {
-            events.Add((at, () =>
-            {
-                HitStop(blow.Crit || skill ? 0.11f : 0.06f);
-                Shake(blow.Crit ? 0.09f : skill ? 0.07f : 0.04f);
-                pops.Damage(() => target.Model.position + Vector3.up * 0.55f, blow.Damage, skill, blow.Crit, Now);
-                target.Health = blow.Kill ? 0 : Mathf.Max(0.02f, target.Health - blow.Damage / 1000f);
-                Play(target, blow.Kill ? "death" : "hit");
-                Flash(target, true);
-            }));
-            events.Add((at + 0.09f, () => Flash(target, false)));
-            motions.Add((at, at + 0.25f, u =>
-            {
-                var k = 0.18f * Mathf.Exp(-u * 6) * Mathf.Cos(u * 9);
-                target.Model.localScale = Vector3.Scale(target.Scale, new Vector3(1 + k, 1 - k, 1 + k));
-            }));
-            if (blow.Kill)
-                events.Add((at + 0.8f, () =>
-                {
-                    var fx = Spawn(Shatter, target.Root.position);
-                    fx.transform.Find("Shards").GetComponent<ParticleSystemRenderer>().sharedMaterial = target.Renderers[0].sharedMaterial;
-                    target.Model.gameObject.SetActive(false);
-                    foreach (var name in new[] { "BarBack", "BarFill", "ActiveRing" })
-                    {
-                        var t = target.Root.Find(name);
-                        if (t != null) t.gameObject.SetActive(false);
-                    }
-                    Shake(0.05f);
-                }));
-            else
-                events.Add((at + 0.5f, () => Play(target, "idle", 0.2f)));
-        }
-
-        /// <summary>A pounce from `from` to `to` over 0.4 s, turning to face the way it goes.</summary>
-        private void Leap(Piece p, Func<Vector3> from, Func<Vector3> to, float s)
-        {
-            events.Add((s, () => Play(p, "leap")));
-            motions.Add((s, s + 0.4f, u =>
-            {
-                Vector3 a = from(), b = to();
-                var k = HuShowUi.Smooth(Mathf.InverseLerp(0.1f, 0.85f, u));
-                p.Model.position = Vector3.Lerp(a, b, k) + Vector3.up * 0.4f * 4 * k * (1 - k);
-                var face = Quaternion.AngleAxis(Vector3.SignedAngle(p.Forward, Flat(b - a), Vector3.up), Vector3.up) * p.Rest;
-                p.Model.rotation = Quaternion.Slerp(p.Model.rotation, face, Mathf.Clamp01(u * 5));
-            }));
-        }
 
         private void MoveRing(Piece p)
         {
             if (ring == null) return;
             ring.gameObject.SetActive(p != null);
             if (p != null) ring.SetParent(p.Root, false);
+        }
+
+        /// <summary>A shattered piece is gone: model and bar hidden (and the ring, if it stood there).</summary>
+        private static void Show(Piece p, bool on)
+        {
+            p.Model.gameObject.SetActive(on);
+            foreach (var name in on ? new[] { "BarBack", "BarFill" } : new[] { "BarBack", "BarFill", "ActiveRing" })
+            {
+                var t = p.Root.Find(name);
+                if (t != null) t.gameObject.SetActive(on);
+            }
         }
 
         private static void Play(Piece p, string clip, float fade = 0.05f)
@@ -363,7 +257,10 @@ namespace Automatic.Game
             }
         }
 
-        /// <summary>Freezes animation and particles for a moment (real time), so the blow lands.</summary>
+        /// <summary>
+        /// Freezes animation and particles for a moment (real time), so the blow lands. The battle
+        /// clock runs on: what comes next still starts at its tick.
+        /// </summary>
         private void HitStop(float seconds)
         {
             Time.timeScale = 0.03f;
@@ -381,6 +278,8 @@ namespace Automatic.Game
             var source = prefab(name);
             var go = UnityEngine.Object.Instantiate(source, at, source.transform.rotation);
             UnityEngine.Object.Destroy(go, 4);
+            spawned.RemoveAll(g => g == null);
+            spawned.Add(go);
             return go;
         }
 

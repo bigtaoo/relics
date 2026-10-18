@@ -31,8 +31,13 @@ namespace Automatic.Battle.Sim
     {
         public string Name = "";
         public uint Seed;
-        /// <summary>30 Hz, 30 s battle phase (design/00, 01 §3).</summary>
+        /// <summary>30 s battle phase (design/00). Every tick count here and in the templates is authored at 30 Hz.</summary>
         public int MaxTicks = 900;
+        /// <summary>
+        /// Logic ticks per second (ADR-014 measured 30 against 10). Tick counts and speeds are scaled from
+        /// their 30 Hz values, so 30 runs the battle exactly as authored.
+        /// </summary>
+        public int TickRate = 30;
         public int Width = 7, Height = 8;
         public int SummonersPerSide;
         public int SummonEvery = 45, SummonBatch = 6;
@@ -60,6 +65,9 @@ namespace Automatic.Battle.Sim
         public static readonly UnitTemplate Summon = new UnitTemplate(220, 22, 10, 3, 15, 6, 30, 10);
 
         public static FP Tenths(int v) => FP.FromRatio(v, 10);
+
+        /// <summary>A duration authored in 30 Hz ticks, at this config's tick rate.</summary>
+        public int Ticks(int at30) => at30 * TickRate / 30;
 
         /// <summary>A normal battle: eight heroes a side, no summons.</summary>
         public static SimConfig Duel16(uint seed) => new SimConfig { Name = "duel16", Seed = seed };

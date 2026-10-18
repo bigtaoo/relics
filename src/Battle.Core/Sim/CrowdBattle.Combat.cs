@@ -59,7 +59,7 @@ namespace Automatic.Battle.Sim
         private void Cast(SimUnit u, SimUnit t)
         {
             Emit(SimEventKind.Cast, u.Id, t.Id, FP.Zero);
-            AddBuff(u, BuffKind.AttackUp, AttackUpPerCast, AttackUpTicks, u.Id);
+            AddBuff(u, BuffKind.AttackUp, AttackUpPerCast, attackUpTicks, u.Id);
             switch (u.Skill)
             {
                 case SkillKind.Blast:
@@ -68,12 +68,12 @@ namespace Automatic.Battle.Sim
                     break;
                 case SkillKind.Burn:
                     EnemiesAround(u, t);
-                    var perTick = u.Atk * u.SkillPower / (BurnTicks / BurnEvery);
-                    for (int i = 0; i < near.Count; i++) AddBuff(Units[near[i]], BuffKind.Burn, perTick, BurnTicks, u.Id);
+                    var perTick = u.Atk * u.SkillPower / (burnTicks / burnEvery);
+                    for (int i = 0; i < near.Count; i++) AddBuff(Units[near[i]], BuffKind.Burn, perTick, burnTicks, u.Id);
                     break;
                 case SkillKind.Stun:
                     EnemiesAround(u, t);
-                    for (int i = 0; i < near.Count; i++) Units[near[i]].StunnedUntil = Tick + StunTicks;
+                    for (int i = 0; i < near.Count; i++) Units[near[i]].StunnedUntil = Tick + stunTicks;
                     break;
                 case SkillKind.Shield:
                     LowestAllies(u, 3);
@@ -151,7 +151,7 @@ namespace Automatic.Battle.Sim
                 if (u.Buffs[i].Kind == kind && u.Buffs[i].Source == source) slot = i;
             if (slot < 0 && u.BuffCount < SimUnit.MaxBuffs) slot = u.BuffCount++;
             if (slot < 0) slot = 0;
-            u.Buffs[slot] = new Buff { Kind = kind, Amount = amount, Until = Tick + ticks, NextTick = Tick + BurnEvery, Source = source };
+            u.Buffs[slot] = new Buff { Kind = kind, Amount = amount, Until = Tick + ticks, NextTick = Tick + burnEvery, Source = source };
         }
 
         private void UpdateBuffs(SimUnit u)
@@ -163,7 +163,7 @@ namespace Automatic.Battle.Sim
                 if (b.Kind == BuffKind.Burn && Tick >= b.NextTick)
                 {
                     Damage(Units[b.Source], u, b.Amount);
-                    b.NextTick += BurnEvery;
+                    b.NextTick += burnEvery;
                 }
                 if (Tick < b.Until) u.Buffs[kept++] = b;
             }
