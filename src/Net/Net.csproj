@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!--
+    Match protocol and client session shared by the Unity client, the server and the bots (ADR-013).
+    Same constraints as Battle.Core: netstandard2.1 + C# 9, no engine references.
+    Unity consumes this folder as a local UPM package (package.json + Automatic.Net.asmdef); it gets
+    Google.Protobuf from Plugins/, .NET from the NuGet package of the same version.
+    Generated/ comes from Proto/ via tools/proto/gen.sh.
+  -->
+  <PropertyGroup>
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <RootNamespace>Automatic.Net</RootNamespace>
+    <AssemblyName>Automatic.Net</AssemblyName>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" Version="3.30.1" />
+    <ProjectReference Include="..\Battle.Core\Battle.Core.csproj" />
+  </ItemGroup>
+</Project>

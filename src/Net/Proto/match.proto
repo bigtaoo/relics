@@ -1,0 +1,196 @@
+// Match protocol between the game client and the match server (design/01, ADR-013).
+// One WebSocket binary frame carries exactly one ClientMessage or ServerMessage.
+// Regenerate Generated/Match.cs with tools/proto/gen.sh after any change here.
+syntax = "proto3";
+
+package automatic.net;
+
+option csharp_namespace = "Automatic.Net.Protocol";
+
+// ---- shared ----
+
+// One hero slot of a player's board. star 0 = not bought yet (fights at reduced strength).
+message Piece {
+  int32 slot = 1;
+  int32 star = 2;
+  int32 col = 3;
+  int32 row = 4;
+}
+
+message Board {
+  repeated Piece pieces = 1;
+}
+
+enum Phase {
+  PHASE_LOBBY = 0;
+  PHASE_PREP = 1;
+  PHASE_BATTLE = 2;
+  PHASE_ENDED = 3;
+}
+
+// ---- client -> server ----
+
+message ClientMessage {
+  oneof body {
+    Join join = 1;
+    Command command = 2;
+    BattleReport report = 3;
+    Ping ping = 4;
+  }
+}
+
+// First message on every connection. resume_token empty = take a free seat, else reclaim that seat.
+message Join {
+  string name = 1;
+  string resume_token = 2;
+}
+
+// Preparation-phase input. The server validates and answers with a CommandResult of the same seq.
+message Command {
+  int32 seq = 1;
+  oneof action {
+    Buy buy = 2;
+    Reroll reroll = 3;
+    Move move = 4;
+  }
+}
+
+message Buy {
+  int32 offer = 1;
+}
+
+message Reroll {}
+
+message Move {
+  int32 slot = 1;
+  int32 col = 2;
+  int32 row = 3;
+}
+
+// End-of-battle state hash, one per battle of the round (design/01 §6).
+message BattleReport {
+  int32 round = 1;
+  int32 battle_id = 2;
+  fixed64 hash = 3;
+  int32 end_tick = 4;
+}
+
+message Ping {
+  int64 client_ms = 1;
+}
+
+// ---- server -> client ----
+
+message ServerMessage {
+  // Server clock when sent; with Pong it drives the clock offset (design/01 §3.3).
+  int64 server_ms = 1;
+  oneof body {
+    Welcome welcome = 2;
+    MatchState state = 3;
+    PrepStart prep = 4;
+    PlayerState self = 5;
+    CommandResult result = 6;
+    PublicBoard board = 7;
+    BattleRound battle = 8;
+    RoundResult round_result = 9;
+    MatchEnd end = 10;
+    Pong pong = 11;
+  }
+}
+
+message Welcome {
+  int32 player_id = 1;
+  string resume_token = 2;
+  int32 seats = 3;
+}
+
+message PlayerInfo {
+  int32 id = 1;
+  string name = 2;
+  int32 hp = 3;
+  bool connected = 4;
+  Board board = 5;
+  // 0 while alive, else the final place (8 = first out).
+  int32 place = 6;
+}
+
+// Private preparation state: only ever sent to its owner. The shop's pool and RNG never leave the server.
+message PlayerState {
+  int32 gold = 1;
+  // Hero slot offered at each shop position, -1 = already bought.
+  repeated int32 shop = 2;
+  Board board = 3;
+}
+
+// The whole picture, sent right after Welcome (first join and every reconnect, design/01 §5).
+message MatchState {
+  Phase phase = 1;
+  int32 round = 2;
+  int64 phase_ends_ms = 3;
+  repeated PlayerInfo players = 4;
+  PlayerState self = 5;
+  // Set during the battle phase: the client fast-forwards every battle to the current tick.
+  BattleRound battle = 6;
+}
+
+message PrepStart {
+  int32 round = 1;
+  int64 ends_ms = 2;
+  PlayerState self = 3;
+}
+
+message CommandResult {
+  int32 seq = 1;
+  bool ok = 2;
+  string error = 3;
+}
+
+// Line-ups are public: every accepted board change is broadcast.
+message PublicBoard {
+  int32 player_id = 1;
+  Board board = 2;
+}
+
+// Everything a client needs to simulate the round (design/01 §3.2). Seeds are drawn at t0.
+message BattleRound {
+  int32 round = 1;
+  int64 t0_ms = 2;
+  int32 tick_hz = 3;
+  int32 max_ticks = 4;
+  int64 ends_ms = 5;
+  repeated BattleSpec battles = 6;
+}
+
+message BattleSpec {
+  int32 battle_id = 1;
+  int32 player_a = 2;
+  // -1 for a ghost (copy of another player's board, odd number alive).
+  int32 player_b = 3;
+  Board a = 4;
+  Board b = 5;
+  uint32 seed = 6;
+}
+
+message BattleOutcome {
+  int32 battle_id = 1;
+  // 0 = side A, 1 = side B, 2 = draw.
+  int32 winner = 2;
+  fixed64 hash = 3;
+  int32 end_tick = 4;
+}
+
+// Authoritative results, sent at the round's end time; hp and places already applied.
+message RoundResult {
+  int32 round = 1;
+  repeated BattleOutcome outcomes = 2;
+  repeated PlayerInfo players = 3;
+}
+
+message MatchEnd {
+  // Player ids, first place first.
+  repeated int32 ranking = 1;
+}
+
+message Pong {
+  int64 client_ms = 1;
+}

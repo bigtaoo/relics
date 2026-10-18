@@ -3,7 +3,7 @@
 | 文档 | 内容 | 状态 |
 |---|---|---|
 | [00-vision.md](00-vision.md) | 项目定位、核心体验、已定设计、市场结论 | 已定 |
-| [01-sync-architecture.md](01-sync-architecture.md) | 混合同步架构、战斗时间轴、观战、断线重连 | 草案 |
+| [01-sync-architecture.md](01-sync-architecture.md) | 混合同步架构、战斗时间轴、观战、断线重连、对局最小闭环与实测 | 草案；最小闭环已实现 |
 | [02-sanzhan-rules.md](02-sanzhan-rules.md) | 三国演弈规则还原规格（第一阶段照搬对象） | 等待截图 |
 | [03-skill-system.md](03-skill-system.md) | 战法 / 效果框架（数据驱动） | 草案 |
 | [04-art-direction.md](04-art-direction.md) | 3D 美术方向与可读性约束 | 讨论中 |

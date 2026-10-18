@@ -1,0 +1,10 @@
+{
+  "name": "com.automatic.net",
+  "version": "0.1.0",
+  "displayName": "Automatic Net",
+  "description": "Match protocol (protobuf over WebSocket) and client session shared by client, server and bots.",
+  "unity": "6000.0",
+  "dependencies": {
+    "com.automatic.battle.core": "0.1.0"
+  }
+}

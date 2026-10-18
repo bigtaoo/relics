@@ -6,6 +6,14 @@
       "source": "local",
       "dependencies": {}
     },
+    "com.automatic.net": {
+      "version": "file:../../src/Net",
+      "depth": 0,
+      "source": "local",
+      "dependencies": {
+        "com.automatic.battle.core": "0.1.0"
+      }
+    },
     "com.code-philosophy.hybridclr": {
       "version": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.15.0",
       "depth": 0,

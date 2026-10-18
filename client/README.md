@@ -9,6 +9,7 @@ Unity 6.3 LTS (6000.3.x), URP, IL2CPP on all platforms. Hot update: HybridCLR (c
 |---|---|---|
 | `Assets/Boot/` | `Automatic.Boot` | No (AOT shell). Must never reference hot assemblies |
 | `Packages/` → `src/Battle.Core` | `Automatic.Battle.Core` | No: compiled into the shell, 12x faster than interpreted (ADR-010). A core change needs a new player build; `BuildHotUpdate` refuses to publish one (`ShellCore`) |
+| `Packages/` → `src/Net` | `Automatic.Net` (+ `Plugins/Google.Protobuf.dll`) | Not yet wired: compiles in the editor, nothing references it. When the game client uses it, add it to the hot-update list before `Automatic.Game` and keep `Google.Protobuf` in the shell (`link.xml` + AOT metadata), ADR-013 |
 | `Assets/HotUpdate/Game/` | `Automatic.Game` | Yes. Entry: `Automatic.Game.GameEntry.Start()` |
 | `Assets/HotRes/` | — | Yes. Everything here is collected into the YooAsset package `DefaultPackage`: one bundle per folder, with each folder's materials and textures in bundles of their own (`MaterialPackRule.cs`) |
 | `Assets/Editor/` | `Automatic.Editor` | Editor only: setup and build menus |

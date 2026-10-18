@@ -121,3 +121,30 @@
 - **影响**：
   - 改分析器后要连同 `src/Battle.Core/Analyzers/` 里的 DLL 一起提交。构建是确定性的，代码不变时 DLL 字节不变，不会产生无意义的改动。
   - 以后的战法数据程序集（03 §7）如果也要确定性，加上同一个程序集标记即可。
+
+## ADR-013 · 2026-10-18 · 对局网络：WebSocket + protobuf
+
+- **结论**：
+  - 传输用 WebSocket（二进制帧，一条消息一帧）。服务端 Kestrel（ASP.NET Core），客户端 `System.Net.WebSockets.ClientWebSocket`。
+  - 消息格式用 protobuf：Google.Protobuf 3.30.1，`protoc` 生成的 C# 提交进仓库（`tools/proto/gen.sh`）。
+  - 协议、时钟同步、回合模拟、快照到战斗的转换放在 `src/Net`（`Automatic.Net`）。它和 Core 一样，既被服务端 ProjectReference，也是 Unity 本地包 `com.automatic.net`。
+- **理由**：
+  - **WebSocket 而不是裸 TCP**：
+    - 自带消息分帧。
+    - 走 80/443，能过公司网络和运营商的代理，以后上 WebGL/小游戏平台也能用。
+    - 和 HTTP 网关共用一套 TLS、负载均衡和证书。
+    - 对局流量很小（见 01 §8），帧头那几个字节的开销无关紧要。
+  - **protobuf 而不是 MemoryPack**：
+    - 生成代码是普通 C#，没有反射，也没有运行时代码生成，IL2CPP 和 HybridCLR 解释器下都能直接跑。社区里 HybridCLR + protobuf 的组合用得很多。
+    - 协议要跨版本演进：老壳和新服要能共存一段时间（07 §5）。protobuf 加字段向前、向后都兼容；MemoryPack 的兼容性绑在内存布局上，要额外加版本标注。
+    - 其他语言的工具（抓包解析、运营后台、压测）现成就有。
+    - MemoryPack 的速度优势在这里用不上：每个客户端每回合只有几 KB。另外它要在 Unity 里配源码生成器，C# 版本要求也比 Core 的 C# 9 高。
+- **影响**：
+  - `src/Net/Generated/Match.cs` 是生成文件（约 7400 行），不受 500 行规则约束，不要手改；改 `src/Net/Proto/*.proto` 后跑 `tools/proto/gen.sh`。
+  - Unity 侧用预编译的 `src/Net/Plugins/Google.Protobuf.dll`（netstandard2.0），asmdef 用 `overrideReferences` 显式引用它。
+  - 客户端代码不要对消息调用 `ToString()` 或 JSON 格式化：那条路径走反射，IL2CPP 裁剪后可能出错。二进制解析不受影响。
+  - 正式接入游戏客户端时：
+    - `Automatic.Net` 加进热更列表，排在 `Automatic.Game` 之前。协议跟着玩法一起热更。
+    - `Google.Protobuf` 留在壳里：`link.xml` 整体保留它，并把它加进补充元数据列表，让热更代码能实例化它的泛型（同 ADR-010 对 Core 的处理）。
+    - 这一步要在真机上验证，本次只验证了 Unity 编辑器能编译。
+  - `BattleFactory`（快照 → 战斗）属于确定性输入，改它等于改 Core：所有端的结果都会变，要按 Core 的规则处理 `EngineVersion`。

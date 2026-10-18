@@ -8,6 +8,7 @@
   ],
   "dependencies": {
     "com.automatic.battle.core": "file:../../src/Battle.Core",
+    "com.automatic.net": "file:../../src/Net",
     "com.code-philosophy.hybridclr": "https://github.com/focus-creative-games/hybridclr_unity.git#v8.15.0",
     "com.tuyoogame.yooasset": "3.0.6",
     "com.unity.render-pipelines.universal": "17.3.0",
