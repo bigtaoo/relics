@@ -54,12 +54,17 @@ namespace Automatic.Editor
             PlayerSettings.meshDeformation = MeshDeformation.GPUBatched;
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.iOS.targetOSVersionString = "15.0";
-            // Phones play landscape only (art/ui/README.md §5); either side up.
-            PlayerSettings.defaultInterfaceOrientation = UIOrientation.AutoRotation;
-            PlayerSettings.allowedAutorotateToPortrait = false;
+            // Portrait on every platform (ADR-011): phones never rotate; on PC the window opens tall and
+            // a wider window or fullscreen shows the game as a centred column (HudLayout).
+            PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
+            PlayerSettings.allowedAutorotateToPortrait = true;
             PlayerSettings.allowedAutorotateToPortraitUpsideDown = false;
-            PlayerSettings.allowedAutorotateToLandscapeLeft = true;
-            PlayerSettings.allowedAutorotateToLandscapeRight = true;
+            PlayerSettings.allowedAutorotateToLandscapeLeft = false;
+            PlayerSettings.allowedAutorotateToLandscapeRight = false;
+            PlayerSettings.fullScreenMode = FullScreenMode.Windowed;
+            PlayerSettings.defaultScreenWidth = 540;
+            PlayerSettings.defaultScreenHeight = 960;
+            PlayerSettings.resizableWindow = true;
             // relics://run?cdn=...&args=... starts benches on iOS, which has no launch arguments (LaunchArgs).
             PlayerSettings.iOS.iOSUrlSchemes = new[] { "relics" };
             // Local CDN is plain http during validation; tighten when a real CDN exists.

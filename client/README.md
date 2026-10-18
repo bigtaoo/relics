@@ -31,7 +31,7 @@ battle start and a scripted battle of about 16 s (`BattleScript.cs` / `BattleSho
 §4); click again or press R to start over, Esc quits. With the CDN running (below):
 
 ```bash
-artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 1600 -screen-height 900
+artifacts/player/PC/Relics.exe -screen-fullscreen 0 -screen-width 540 -screen-height 960
 ```
 
 `-autoplay <dir>` runs it by itself and saves screenshots along the timeline as raw RGB24 (the
@@ -43,10 +43,11 @@ Hot code may only call engine API the shell kept: `Assets/Boot/link.xml` preserv
 modules hot code is expected to use (design/07 §4). A `MissingMethodException` in the player log
 means the API was stripped from the shell: add its module there and rebuild the player.
 
-Phones get their own HUD scale and layout (`PhoneLayout.cs`, art/ui/README.md §5.1). To see it on
-PC, open the window at the phone's aspect and name the phone: `-device iphone13|a16 -layout A|B|C`
-(e.g. `-screen-width 1560 -screen-height 720`). With `-autoplay` the log has the on-screen size of
-the board cells (`[Demo] ... front-row cell`).
+The game is portrait everywhere (design/DECISIONS.md ADR-011, art/ui/README.md §5.2). `HudLayout.cs`
+lays out the HUD in a column no wider than 0.6 of its height; a wider window or fullscreen shows
+side margins. Phones scale the HUD by physical size. To see a phone on PC, open the window at its
+aspect and name it: `-device iphone13|a16` (e.g. `-screen-width 540 -screen-height 1170`). With
+`-autoplay` the log has the on-screen size of the board cells (`[Demo] ... front-row cell`).
 
 Art in `Assets/HotRes/` (models, clips, prefabs) only needs `BuildHotUpdate`; the player picks up
 the new version on its next start. Player settings stay as built: `runInBackground` is on, since

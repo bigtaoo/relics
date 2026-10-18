@@ -5,48 +5,13 @@ using UnityEngine;
 namespace Automatic.Game
 {
     /// <summary>
-    /// The two camera framings of design/04 §2 for the current screen: the battle framing of the
-    /// whole table and the preparation framing of the player's half in the screen area the HUD
-    /// leaves free. Same angle and FOV; only the position differs. Runtime port of
+    /// The two camera framings of design/04 §2: the battle framing of the whole table and the
+    /// preparation framing of the player's half, each fitted into the screen area the HUD leaves
+    /// free (HudLayout). Same angle and FOV; only the position differs. Runtime port of
     /// Editor/BoardSlice.cs Fit and Editor/UiSlice.cs Frame.
     /// </summary>
     public static class DemoFraming
     {
-        public static readonly Vector2 Reference = new(1920, 1080);
-
-        /// <summary>Canvas size in reference units, as a CanvasScaler in Expand mode makes it.</summary>
-        public static Vector2 CanvasSize(int w, int h)
-        {
-            var scale = Mathf.Min(w / Reference.x, h / Reference.y);
-            return new Vector2(w / scale, h / scale);
-        }
-
-        /// <summary>Whole table: the camera backs off from the table centre until every corner fits.</summary>
-        public static Vector3 Battle(Camera cam, float halfWidth, float halfDepth)
-        {
-            var points = new List<Vector3>();
-            foreach (var x in new[] { -halfWidth, halfWidth })
-                foreach (var z in new[] { -halfDepth, halfDepth })
-                    foreach (var y in new[] { 0f, 1f })
-                        points.Add(new Vector3(x, y, z));
-            const float margin = 0.02f;
-            var t = cam.transform;
-            for (var dist = 5f; dist < 60; dist += 0.05f)
-            {
-                t.position = new Vector3(0, 0.3f, 0) - t.forward * dist;
-                if (points.Select(cam.WorldToViewportPoint).All(p => p.x > margin && p.x < 1 - margin && p.y > margin && p.y < 1 - margin))
-                    break;
-            }
-            return t.position;
-        }
-
-        /// <summary>
-        /// The PC HUD's free area (viewport units) for a canvas of `size`: right of the hand panel,
-        /// above the shop tray, below the round bar.
-        /// </summary>
-        public static Rect PcFree(Vector2 size) =>
-            Rect.MinMaxRect((24 + 430 + 16) / size.x, (12 + 290 + 8) / size.y, 1 - 16 / size.x, 1 - 96 / size.y);
-
         /// <summary>The player's half and bench (z from -halfDepth to `top`) fitted into `free` (viewport units).</summary>
         public static Vector3 Prep(Camera cam, float halfWidth, float halfDepth, float top, Rect free) =>
             Fit(cam, halfWidth, -halfDepth, top, 0.9f, free);

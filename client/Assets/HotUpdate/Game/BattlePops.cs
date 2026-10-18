@@ -68,12 +68,20 @@ namespace Automatic.Game
             var rect = (RectTransform)go.transform;
             rect.SetParent(hud, false);
             rect.anchorMin = rect.anchorMax = new Vector2(0.5f, 0.5f);
-            rect.sizeDelta = new Vector2(900, 300);
             var text = go.AddComponent<TextMeshProUGUI>();
             text.font = title;
             text.fontSharedMaterial = outlined;
             text.text = s;
             text.fontSize = size;
+            // Banners span the screen: in the narrow portrait column (HudLayout) they shrink to fit.
+            rect.sizeDelta = new Vector2(anchor == null ? hud.rect.width - 24 : 900, 300);
+            if (anchor == null)
+            {
+                text.textWrappingMode = TextWrappingModes.NoWrap;
+                text.enableAutoSizing = true;
+                text.fontSizeMin = size * 0.5f;
+                text.fontSizeMax = size;
+            }
             text.color = color;
             text.alignment = TextAlignmentOptions.Center;
             text.lineSpacing = -45;

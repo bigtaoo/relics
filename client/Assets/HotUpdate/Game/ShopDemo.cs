@@ -54,11 +54,9 @@ namespace Automatic.Game
         private int fired;
         private float clickedAt = -1;
         private float halfWidth, halfDepth, prepTop;
-        private Vector2Int screen;
-        private Vector3 prepPos, prepOpenPos, battlePos, huCentre;
-        private PhoneLayout phone;
+        private Vector3 prepPos, battlePos, huCentre;
+        private HudLayout layout;
         private Rect freeAt;
-        private float shopOpenAt = -1;
         private BattleShow battle;
 
         public static void Run(ResourcePackage package)
@@ -95,12 +93,6 @@ namespace Automatic.Game
             yield return new WaitForSeconds(1);
             var shots = new[] { 0.3f, 1.0f, 1.9f, 2.7f, 4.2f, 5.2f, 7.2f };
             yield return Capture("0.0");
-            if (phone?.ShopButton != null)
-            {
-                OpenShop();
-                yield return new WaitForSeconds(0.5f);
-                yield return Capture("0.0open");
-            }
             yield return new WaitForSeconds(0.2f);
             Click();
             // Battle: each act's blow (attack contact, skill impact), the hand going off, the end.
@@ -125,11 +117,12 @@ namespace Automatic.Game
         private IEnumerator Capture(string name)
         {
             yield return new WaitForEndOfFrame();
-            // Size of the pieces on screen: spacing of the player's front row (design/08 §3 phone layouts).
+            // Size of the pieces on screen: spacing of the player's front row (art/ui/README.md §5).
             var front = allies.Max(u => u.Root.position.z);
             var xs = allies.Where(u => u.Root.position.z > front - 0.01f).Select(u => cam.WorldToScreenPoint(u.Root.position).x).OrderBy(x => x).ToList();
             var cell = Enumerable.Range(1, xs.Count - 1).Min(i => xs[i] - xs[i - 1]);
-            Debug.Log($"[Demo] {name}: front-row cell {cell:F0} of {Screen.height} px" + (phone != null ? $" = {cell / Screen.height * phone.ShortMm:F1} mm" : ""));
+            var width = layout.ColumnPx.width;
+            Debug.Log($"[Demo] {name}: front-row cell {cell:F0} of {width:F0} px" + (layout.ShortMm > 0 ? $" = {cell / width * layout.ShortMm:F1} mm" : ""));
             var tex = new Texture2D(Screen.width, Screen.height, TextureFormat.RGB24, false);
             tex.ReadPixels(new Rect(0, 0, Screen.width, Screen.height), 0, 0);
             System.IO.File.WriteAllBytes(System.IO.Path.Combine(autoplay, $"demo_{name}_{Screen.width}x{Screen.height}.rgb"), tex.GetRawTextureData());
@@ -178,24 +171,15 @@ namespace Automatic.Game
 
             var canvas = new GameObject("Hud", typeof(Canvas), typeof(CanvasScaler), typeof(GraphicRaycaster));
             canvas.GetComponent<Canvas>().renderMode = RenderMode.ScreenSpaceOverlay;
-            var scaler = canvas.GetComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = DemoFraming.Reference;
-            scaler.screenMatchMode = CanvasScaler.ScreenMatchMode.Expand;
-            phone = PhoneLayout.Detect();
-            var hud = phone != null ? phone.Setup(canvas.GetComponent<Canvas>(), scaler) : canvas.transform;
+            layout = HudLayout.Detect();
+            var hud = layout.Setup(canvas.GetComponent<Canvas>(), canvas.GetComponent<CanvasScaler>(), cam);
             var shop = Instantiate(prefabs[ShopPrefab], hud).GetComponent<RectTransform>();
-            phone?.Apply(shop);
-            ui = new HuShowUi(shop, HuCard);
-            if (phone != null)
-            {
-                ui.HuScale = 0.65f;
-                if (phone.ShopButton != null)
-                {
-                    ui.TrayOpen = 0;
-                    phone.ShopButton.gameObject.AddComponent<Button>().onClick.AddListener(OpenShop);
-                }
-            }
+            layout.Apply(shop);
+            ui = new HuShowUi(shop, HuCard) { HuScale = 0.65f };
+            // The prefab's images take no raycasts (Editor/UiShop.cs), so the card gets a clear hit area.
+            var hit = ui.Card.gameObject.AddComponent<Image>();
+            hit.color = Color.clear;
+            hit.canvasRenderer.cullTransparentMesh = true;
             var button = ui.Card.gameObject.AddComponent<Button>();
             button.transition = Selectable.Transition.None;
             button.onClick.AddListener(Click);
@@ -204,12 +188,11 @@ namespace Automatic.Game
 
             hint = Instantiate(shop.Find("RoundBar/Round").gameObject, hud).GetComponent<TextMeshProUGUI>();
             var rt = hint.rectTransform;
-            // Top right on PC; bottom left on phones, under the left column (the battle framing
-            // fills the rest of the height).
-            rt.anchorMin = rt.anchorMax = rt.pivot = phone != null ? Vector2.zero : Vector2.one;
-            rt.anchoredPosition = phone != null ? new Vector2(16, 16) : new Vector2(-32, -28);
+            // At the bottom, where the shop tray was before the battle.
+            rt.anchorMin = rt.anchorMax = rt.pivot = new Vector2(0.5f, 0);
+            rt.anchoredPosition = new Vector2(0, 24);
             rt.sizeDelta = new Vector2(600, 50);
-            hint.alignment = phone != null ? TextAlignmentOptions.Left : TextAlignmentOptions.Right;
+            hint.alignment = TextAlignmentOptions.Center;
             hint.color = new Color(0.22f, 0.14f, 0.09f); // ink on the parchment table
             hint.text = "点击任意处重来（R）";
             hint.gameObject.SetActive(false);
@@ -219,8 +202,7 @@ namespace Automatic.Game
                 new BattlePops((RectTransform)hud, cam, shop), shop.Find("RoundBar/Round").GetComponent<TextMeshProUGUI>());
             events.Clear();
             fired = 0;
-            clickedAt = shopOpenAt = -1;
-            screen = Vector2Int.zero;
+            clickedAt = -1;
             freeAt = default;
             Schedule();
         }
@@ -265,11 +247,6 @@ namespace Automatic.Game
             if (clickedAt < 0) clickedAt = Time.time;
         }
 
-        private void OpenShop()
-        {
-            if (shopOpenAt < 0) shopOpenAt = Time.time;
-        }
-
         private void Update()
         {
             if (loading || ui == null) return;
@@ -282,34 +259,18 @@ namespace Automatic.Game
                 return;
             }
 
-            if (phone == null && (screen.x != Screen.width || screen.y != Screen.height))
+            // The framings follow the HUD's free areas, recomputed whenever they move on screen
+            // (window resizes, and once the canvas has laid out).
+            layout.Refresh();
+            if (layout.Viewport(layout.Free) != freeAt)
             {
-                screen = new Vector2Int(Screen.width, Screen.height);
-                battlePos = DemoFraming.Battle(cam, halfWidth, halfDepth);
-                var size = DemoFraming.CanvasSize(Screen.width, Screen.height);
-                var free = DemoFraming.PcFree(size);
-                prepPos = DemoFraming.Prep(cam, halfWidth, halfDepth, prepTop, free);
-                huCentre = new Vector3((free.center.x - 0.5f) * size.x, 90, 0);
-            }
-            // Phones: the areas come from the layout; recomputed whenever they move on screen
-            // (also once the canvas scaler has run).
-            if (phone != null && PhoneLayout.Viewport(phone.Free) != freeAt)
-            {
-                freeAt = PhoneLayout.Viewport(phone.Free);
+                freeAt = layout.Viewport(layout.Free);
                 prepPos = DemoFraming.Prep(cam, halfWidth, halfDepth, prepTop, freeAt);
-                prepOpenPos = DemoFraming.Prep(cam, halfWidth, halfDepth, prepTop, PhoneLayout.Viewport(phone.ShowArea));
-                battlePos = DemoFraming.Fit(cam, halfWidth, -halfDepth, halfDepth, 1, PhoneLayout.Viewport(phone.BattleArea));
+                battlePos = DemoFraming.Fit(cam, halfWidth, -halfDepth, halfDepth, 1, layout.Viewport(layout.BattleArea));
                 var show = new Vector3[4];
-                phone.ShowArea.GetWorldCorners(show);
+                layout.Free.GetWorldCorners(show);
                 huCentre = ui.Shop.InverseTransformPoint((show[0] + show[2]) / 2);
                 huCentre.z = 0;
-            }
-            if (phone?.ShopButton != null)
-            {
-                var open = shopOpenAt < 0 ? 0 : HuShowUi.Smooth(Mathf.Clamp01((Time.time - shopOpenAt) / 0.3f));
-                ui.TrayOpen = open;
-                phone.ShopButton.gameObject.SetActive(open == 0);
-                phone.Wallet.gameObject.SetActive(open == 0);
             }
 
             var t = clickedAt < 0 ? 0 : Time.time - clickedAt + HuShowUi.Press;
@@ -324,9 +285,7 @@ namespace Automatic.Game
 
             // The camera keeps its angle and glides from the preparation framing to the whole table;
             // the opponent's pieces drop onto their cells row by row.
-            // (Layout B: the board moves up above the tray while the shop opens.)
-            var prep = Vector3.Lerp(prepPos, prepOpenPos, phone?.ShopButton != null ? ui.TrayOpen : 0);
-            cam.transform.position = Vector3.Lerp(prep, battlePos, HuShowUi.Smooth(Mathf.InverseLerp(HuShowUi.MoveStart, HuShowUi.MoveEnd, t)));
+            cam.transform.position = Vector3.Lerp(prepPos, battlePos, HuShowUi.Smooth(Mathf.InverseLerp(HuShowUi.MoveStart, HuShowUi.MoveEnd, t)));
             if (t >= BattleAt)
             {
                 battle.Tick(t - BattleAt);

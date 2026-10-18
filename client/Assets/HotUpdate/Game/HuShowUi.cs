@@ -23,13 +23,7 @@ namespace Automatic.Game
 
         public readonly RectTransform Shop, Card;
 
-        /// <summary>
-        /// How far the shop tray is out (0 hidden below the screen, 1 in place). Phones with the
-        /// shop on demand (PhoneLayout) start it at 0; the battle start slides it away either way.
-        /// </summary>
-        public float TrayOpen = 1;
-
-        /// <summary>Size of the hu show in the middle (phones scale it down, PhoneLayout).</summary>
+        /// <summary>Size of the hu show in the middle (the portrait column scales it down, HudLayout).</summary>
         public float HuScale = 1;
 
         private readonly RectTransform tray, slot, hu;
@@ -97,7 +91,7 @@ namespace Automatic.Game
             var u = Smooth(Mathf.InverseLerp(FlyStart, FlyEnd, t));
             if (flying) Card.localPosition = Vector3.Lerp(from, target, u) + Vector3.up * 160 * Mathf.Sin(u * Mathf.PI);
             var press = t < Press || t >= FlyStart ? 1 : 1 - 0.07f * Mathf.Sin(Mathf.InverseLerp(Press, FlyStart, t) * Mathf.PI);
-            // Layouts may scale the cards and the hand panel (PhoneLayout): land at the tile's size on screen.
+            // The layout scales the cards and the hand panel (HudLayout): land at the tile's size on screen.
             Card.localScale = Vector3.one * press * Mathf.Lerp(cardScale, slot.rect.height * InShop(slot) / Card.rect.height, u);
             Card.gameObject.SetActive(t < FlyEnd);
 
@@ -139,8 +133,9 @@ namespace Automatic.Game
             statusLine.text = formed ? "已成　战斗中发动" : waitingLine;
 
             // Battle start: the shop tray slides off and the round bar switches to the battle.
-            var slide = Mathf.Max(Smooth(Mathf.InverseLerp(Fight, Fight + 0.35f, t)), 1 - TrayOpen);
-            tray.anchoredPosition = new Vector2(tray.anchoredPosition.x, trayY - slide * (tray.rect.height + 40));
+            var slide = Smooth(Mathf.InverseLerp(Fight, Fight + 0.35f, t));
+            // Far enough to clear the bottom safe-area inset as well (iPhone home indicator).
+            tray.anchoredPosition = new Vector2(tray.anchoredPosition.x, trayY - slide * (tray.rect.height + 200));
             round.text = t < Fight ? prepRound : prepRound.Replace("准备", "战斗");
         }
 

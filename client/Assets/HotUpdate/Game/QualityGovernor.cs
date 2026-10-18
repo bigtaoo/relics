@@ -23,7 +23,10 @@ namespace Automatic.Game
         private float nextPoll, lastStep = float.NegativeInfinity, fakeHeatAt = float.PositiveInfinity;
         private float smoothedDelta = 1 / 30f;
 
-        public Tier Quality => quality >= 0 ? (Tier)quality : QualityTiers.Ladder[step].Quality;
+        /// <summary>Top-right corner of the buttons in GUI pixels (origin top left), set by the HUD layout; else the safe area's.</summary>
+        public static Vector2? Corner;
+
+        public Tier Quality =>quality >= 0 ? (Tier)quality : QualityTiers.Ladder[step].Quality;
 
         /// <summary>The frame rate to ask for; 0 on desktop Auto, which follows vsync.</summary>
         public int Fps => fps > 0 ? fps : Application.isMobilePlatform ? QualityTiers.Ladder[step].Fps : 0;
@@ -125,10 +128,10 @@ namespace Automatic.Game
             var scale = Screen.dpi > 0 ? Mathf.Max(1f, Screen.dpi / 160f) : 1f;
             GUI.matrix = Matrix4x4.Scale(new Vector3(scale, scale, 1f));
             var safe = Screen.safeArea;
-            // Top right of the safe area: the board's side margin in every layout (PhoneLayout).
+            var corner = Corner ?? new Vector2(safe.xMax, Screen.height - safe.yMax);
             const float w = 120, h = 36, gap = 6;
-            var x = (safe.xMax / scale) - w - gap;
-            var y = (Screen.height - safe.yMax) / scale + gap;
+            var x = (corner.x / scale) - w - gap;
+            var y = corner.y / scale + gap;
             var qLabel = quality < 0 ? $"Q Auto·{Quality}" : $"Q {Quality}";
             var fLabel = (fps == 0 ? "FPS Auto" : $"FPS {fps}") + $" ({1 / smoothedDelta:0})";
             if (GUI.Button(new Rect(x, y, w, h), qLabel))
