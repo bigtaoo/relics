@@ -179,6 +179,11 @@ install. A fresh install downloads nothing until the CDN has a version newer tha
 the player. Failure handling (retries, download watchdog, resume, cache CRC check) is in
 `ResourceUpdater` / `Boot`, see design/07 §3.
 
+The cache keeps manifests by version number and is shared by every worktree on the machine. Two
+worktrees that each publish, say, `0.1.0.1` with different content make the player load the other's
+cached manifest and fail on 404s. In a worktree, set `artifacts/cdn/PC/DefaultPackage.version` to a
+number nobody else uses (e.g. `0.1.0.8300`) before `BuildHotUpdate`, which publishes the next one.
+
 `tools/hotupdate/` reruns the failure tests:
 - `faulty_cdn.py` serves `artifacts/cdn` with a bandwidth cap, stalls or dropped connections, and
   Range support. `python -m http.server` has no Range support, so resume cannot be tested on it.

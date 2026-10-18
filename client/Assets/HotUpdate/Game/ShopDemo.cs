@@ -41,6 +41,8 @@ namespace Automatic.Game
             public Animator Animator;
             public Renderer[] Renderers;
             public string Tier => Root.name.Substring("Unit ".Length);
+            /// <summary>The model object is named after its kind (zheng, kuafu), as are its materials.</summary>
+            public string Kind => Animator.name;
             public bool Started;
         }
 
@@ -56,7 +58,6 @@ namespace Automatic.Game
         private Vector3[] enemyAt;
         private Vector3 newcomerAt;
         private List<Transform> markers;
-        private Material living;
         private readonly List<(float At, Action Do)> events = new();
         private int fired;
         private float clickedAt = -1;
@@ -160,9 +161,7 @@ namespace Automatic.Game
             }).ToList();
             // The scene is saved in the battle phase: the formed hands wear the living material,
             // every other piece the material of its cost tier.
-            bool Formed(Unit u) => u.Renderers[0].sharedMaterial.name == "zheng_living";
-            living = units.Where(Formed).Select(u => u.Renderers[0].sharedMaterial).First();
-            var tiers = units.Where(u => !Formed(u)).GroupBy(u => u.Tier).ToDictionary(g => g.Key, g => g.First().Renderers[0].sharedMaterial);
+            bool Formed(Unit u) => u.Renderers[0].sharedMaterial.name.EndsWith("_living");
             allies = units.Where(u => u.Root.position.z < 0).ToList();
             enemies = units.Where(u => u.Root.position.z > 0).OrderBy(u => u.Root.position.z).ThenBy(u => u.Root.position.x).ToList();
             enemyAt = enemies.Select(u => u.Root.position).ToArray();
@@ -183,7 +182,7 @@ namespace Automatic.Game
             foreach (var m in markers) m.gameObject.SetActive(false);
             foreach (var u in allies)
             {
-                Wear(u, tiers[u.Tier]);
+                Wear(u, LoadMaterial(u.Kind + "_" + u.Tier));
                 Play(u, "idle", Random.value);
             }
 
@@ -244,7 +243,7 @@ namespace Automatic.Game
                     u.Animator.CrossFade("awaken", 0.12f, 0, 0);
                     Spawn(HuPiece, u.Root.position);
                 }));
-                events.Add((at + 0.1f, () => Wear(u, living)));
+                events.Add((at + 0.1f, () => Wear(u, LoadMaterial(u.Kind + "_living"))));
                 if (i > 0)
                 {
                     var a = hand[i - 1].Root.position;
@@ -360,6 +359,8 @@ namespace Automatic.Game
             u.Animator.speed = Random.Range(0.9f, 1.1f);
             u.Animator.Play(clip, 0, at);
         }
+
+        private Material LoadMaterial(string name) => package.LoadAssetSync<Material>(name).AssetObject as Material;
 
         private static void Wear(Unit u, Material mat)
         {

@@ -27,8 +27,17 @@ Material:
         m_Texture: {fileID: 0}
         m_Scale: {x: 1, y: 1}
         m_Offset: {x: 0, y: 0}
+    - _VatNrm:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _VatPos:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
     m_Ints: []
     m_Floats:
+    - _BodyLum: 0.19
     - _OutlineWidth: 0.004
     - _Recolor: 0
     - _RimPower: 4
@@ -36,7 +45,10 @@ Material:
     - _ShadeSoftness: 0.04
     - _ShadeThreshold: 0.05
     - _SpecSize: 0.08
+    - _SpotLum: 0.125
     - _TailGlow: 0
+    - _Vat: 0
+    - _VatFps: 30
     m_Colors:
     - _BaseColor: {r: 0.42, g: 0.25, b: 0.15, a: 1}
     - _BodyColor: {r: 1, g: 1, b: 1, a: 1}

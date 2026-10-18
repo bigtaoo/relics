@@ -40,16 +40,28 @@ namespace Automatic.Editor
         public int Peak;
 
         private readonly Dictionary<string, AnimationClip> clips;
+        private readonly Dictionary<RuntimeAnimatorController, Dictionary<string, AnimationClip>> byController = new();
         private uint seed = 1;
         private float last = -1;
 
+        /// <summary>clips: Zheng's; a unit of another kind plays the clips of its own controller.</summary>
         public FxTimeline(Dictionary<string, AnimationClip> clips) => this.clips = clips;
+
+        private Dictionary<string, AnimationClip> Clips(SliceUnit unit)
+        {
+            var controller = unit.Model.GetComponent<Animator>().runtimeAnimatorController;
+            if (unit.Model.name == "zheng" || controller == null) return clips;
+            if (!byController.TryGetValue(controller, out var own))
+                byController[controller] = own = controller.animationClips.GroupBy(c => c.name).ToDictionary(g => g.Key, g => g.First());
+            return own;
+        }
 
         /// <summary>Advances to time t; call with increasing times (frame by frame).</summary>
         public void Step(float t)
         {
             foreach (var (unit, clip, start) in Anims)
             {
+                var clips = Clips(unit);
                 var c = clips[clip];
                 if (t < start) clips["idle"].SampleAnimation(unit.Model, t % clips["idle"].length); // idles until its clip starts
                 else if (t - start <= c.length) c.SampleAnimation(unit.Model, t - start);
@@ -105,6 +117,10 @@ namespace Automatic.Editor
         public static Material Variant(string variant) =>
             AssetDatabase.LoadAssetAtPath<Material>(BoardSlice.ZhengDir + "zheng_" + variant + ".mat");
 
+        /// <summary>The unit's own material for a variant; the model object is named after its kind (BoardSlice).</summary>
+        public static Material Variant(SliceUnit unit, string variant) =>
+            AssetDatabase.LoadAssetAtPath<Material>(BoardSlice.ArtDir(unit.Model.name) + unit.Model.name + "_" + variant + ".mat");
+
         public static void Wear(SliceUnit unit, Material mat)
         {
             foreach (var r in unit.Model.GetComponentsInChildren<Renderer>())
@@ -131,7 +147,7 @@ namespace Automatic.Editor
                          .Where(t => t.name is "ActiveRing" or "BarBack" or "BarFill"))
                 t.gameObject.SetActive(false);
             var mine = units.Where(u => u.Root.gameObject.activeSelf).ToList();
-            foreach (var u in mine) Wear(u, Variant(BoardSlice.TierOf(u.Root)));
+            foreach (var u in mine) Wear(u, Variant(u, BoardSlice.TierOf(u.Root)));
             Anims.AddRange(mine.Select((u, i) => (u, "idle", -(i * 1.37f % 4))));
         }
 
@@ -151,13 +167,12 @@ namespace Automatic.Editor
         public SliceUnit[] HandFormed(List<SliceUnit> units, float offset)
         {
             var hand = HandCells.Select(c => Nearest(units, BoardLayout.CellPos(-1, c.Row, c.Col))).ToArray();
-            var living = Variant("living");
             for (var i = 0; i < hand.Length; i++)
             {
                 var at = offset + LightAt(i);
                 Anims.RemoveAll(a => a.Unit == hand[i]);
                 Anims.Add((hand[i], "awaken", at));
-                Swaps.Add((hand[i], Variant(BoardSlice.TierOf(hand[i].Root)), living, at + 0.1f));
+                Swaps.Add((hand[i], Variant(hand[i], BoardSlice.TierOf(hand[i].Root)), Variant(hand[i], "living"), at + 0.1f));
                 Effects.Add(Spawn(FxPrefabs.HuPiece, hand[i].Root.position, at));
                 if (i == 0) continue;
                 Effects.Add(Link(hand[i - 1].Root.position, hand[i].Root.position, at + 0.05f));

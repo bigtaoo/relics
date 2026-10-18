@@ -48,6 +48,8 @@ namespace Automatic.Editor
 
         public static void ArtPreviewDangkang() => Run(() => ArtPreview.Render("dangkang"));
 
+        public static void ArtPreviewKuafu() => Run(() => ArtPreview.Render("kuafu"));
+
         public static void BoardSlice() => Run(Automatic.Editor.BoardSlice.Build);
 
         public static void FxSlice() => Run(Automatic.Editor.FxSlice.Build);

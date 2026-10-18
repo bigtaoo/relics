@@ -17,7 +17,7 @@ namespace Automatic.Editor
 {
     /// <summary>
     /// Board slice (design/08 §2): one full board (both halves and benches filled with Zheng in
-    /// mixed cost-tier materials, team pedestals and health bars, one unit acting) in the battle
+    /// mixed cost-tier materials, plus a Kuafu on each side for the humanoid check of 08 §5, team pedestals and health bars, one unit acting) in the battle
     /// phase: only the pieces of a formed hand are living (04 §6), five on the player's side
     /// (FxTimeline.HandCells) and three on the enemy's; the rest stay artifacts. Saved as a
     /// hot-update scene and rendered from the battle camera at the three target aspect ratios
@@ -27,11 +27,15 @@ namespace Automatic.Editor
     {
         internal const string ScenePath = "Assets/HotRes/Scenes/board_west.unity";
         internal const string ZhengDir = "Assets/HotRes/Art/Zheng/";
+        /// <summary>Folder of a unit kind's art: "kuafu" -> Assets/HotRes/Art/Kuafu/.</summary>
+        internal static string ArtDir(string kind) => $"Assets/HotRes/Art/{char.ToUpperInvariant(kind[0])}{kind[1..]}/";
         // Units face the other side turned by Turn degrees, so the camera sees their profile:
         // a quadruped seen straight from behind or in front reads as a blob.
         internal const float Pitch = 50, Turn = 40;
         private const float Fov = 30;
-        private const float UnitLength = 0.85f, BenchScale = 0.8f;
+        // A beast is scaled to its length, an upright piece to its height (a giant stands a bit
+        // taller than Zheng's 0.875).
+        private const float UnitLength = 0.85f, UnitHeight = 1f, BenchScale = 0.8f;
         private const float PedestalHeight = 0.05f;
 
         // Cost tiers weighted towards the cheap end, as a mid-game board would be.
@@ -39,6 +43,36 @@ namespace Automatic.Editor
 
         /// <summary>The enemy's formed hand (cells on their half).</summary>
         private static readonly (int Row, int Col)[] EnemyHand = { (1, 1), (1, 3), (2, 2) };
+
+        /// <summary>Cells holding a Kuafu instead of a Zheng (side, row, col): one in the player's hand,
+        /// one enemy artifact in the front row (BattleScript: it attacks, is struck and dies).</summary>
+        private static readonly (int Side, int Row, int Col)[] KuafuCells = { (-1, 0, 3), (1, 0, 1) };
+
+        /// <summary>What placing a unit kind needs: model, clips by name, materials by variant, controller, probe.</summary>
+        private sealed class Kind
+        {
+            public GameObject Model;
+            public Dictionary<string, AnimationClip> Clips;
+            public Dictionary<string, Material> Mats;
+            public AnimatorController Controller;
+            public (Quaternion Facing, float Scale, float Height, float Lift) Probe;
+
+            public static Kind Load(string kind)
+            {
+                var dir = ArtDir(kind);
+                var model = AssetDatabase.LoadAssetAtPath<GameObject>(dir + kind + ".fbx") ?? throw new Exception($"missing {kind}.fbx");
+                var clips = AssetDatabase.LoadAllAssetsAtPath(dir + kind + ".fbx").OfType<AnimationClip>()
+                    .Where(c => !c.name.StartsWith("__preview__")).ToDictionary(c => c.name);
+                var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(dir + kind + "_basecolor.png");
+                return new Kind
+                {
+                    Model = model, Clips = clips,
+                    Mats = ToonVariants.For(kind).ToDictionary(v => v.Name, v => v.Write(dir + kind + "_" + v.Name + ".mat", tex)),
+                    Controller = BoardSlice.Controller(kind, clips.Values),
+                    Probe = BoardSlice.Probe(model, clips["idle"]),
+                };
+            }
+        }
 
         /// <summary>Unit roots are named "Unit &lt;tier&gt;": the artifact material, also for living pieces.</summary>
         internal static string TierOf(Transform root) => root.name.Substring("Unit ".Length);
@@ -52,12 +86,7 @@ namespace Automatic.Editor
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             BoardDressing.Build();
 
-            var model = AssetDatabase.LoadAssetAtPath<GameObject>(ZhengDir + "zheng.fbx") ?? throw new Exception("missing zheng.fbx");
-            var clips = AssetDatabase.LoadAllAssetsAtPath(ZhengDir + "zheng.fbx").OfType<AnimationClip>()
-                .Where(c => !c.name.StartsWith("__preview__")).ToDictionary(c => c.name);
-            var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(ZhengDir + "zheng_basecolor.png");
-            var mats = ToonVariants.For("zheng").ToDictionary(v => v.Name, v => v.Write(ZhengDir + "zheng_" + v.Name + ".mat", tex));
-            var controller = Controller(clips.Values);
+            var kinds = new[] { "zheng", "kuafu" }.ToDictionary(k => k, Kind.Load);
             var team = new[]
             {
                 (Pedestal: BoardDressing.Toon("board_pedestal_ally", new Color(0.32f, 0.52f, 0.72f), null, 0.006f), Bar: BoardDressing.Unlit("board_bar_ally", new Color(0.3f, 0.85f, 0.35f))),
@@ -68,12 +97,12 @@ namespace Automatic.Editor
             var ringMesh = BoardDressing.SaveMesh("board_ring", Ring(0.4f, 0.5f));
             var pedestalMesh = BoardDressing.SaveMesh("board_pedestal", BoardDressing.Cylinder(32));
 
-            var (facing, scale, height, lift) = Probe(model, clips["idle"]);
-
             var rng = new Random(7);
             var units = new GameObject("Units").transform;
-            void Place(Vector3 pos, int side, string tier, bool living, string clip, float time, float size, bool active = false)
+            void Place(Vector3 pos, int side, string tier, bool living, string clip, float time, float size, bool active = false, string kind = "zheng")
             {
+                var k = kinds[kind];
+                var (facing, scale, height, lift) = k.Probe;
                 var root = new GameObject("Unit " + tier).transform;
                 var mat = living ? "living" : tier;
                 root.SetParent(units);
@@ -82,15 +111,15 @@ namespace Automatic.Editor
                 pedestal.transform.SetParent(root, false);
                 pedestal.transform.localScale = new Vector3(0.72f * size, PedestalHeight, 0.72f * size);
 
-                var unit = (GameObject)PrefabUtility.InstantiatePrefab(model, root);
+                var unit = (GameObject)PrefabUtility.InstantiatePrefab(k.Model, root); // named after its kind (ShopDemo, FxTimeline)
                 unit.transform.localPosition = new Vector3(0, PedestalHeight + lift * size, 0);
-                unit.transform.localRotation = Quaternion.Euler(0, (side > 0 ? 180 : 0) + Turn, 0) * facing * model.transform.localRotation;
+                unit.transform.localRotation = Quaternion.Euler(0, (side > 0 ? 180 : 0) + Turn, 0) * facing * k.Model.transform.localRotation;
                 unit.transform.localScale = Vector3.one * scale * size;
                 foreach (var r in unit.GetComponentsInChildren<Renderer>())
-                    r.sharedMaterials = Enumerable.Repeat(mats[mat], r.sharedMaterials.Length).ToArray();
+                    r.sharedMaterials = Enumerable.Repeat(k.Mats[mat], r.sharedMaterials.Length).ToArray();
                 if (!unit.TryGetComponent(out Animator animator)) animator = unit.AddComponent<Animator>();
-                animator.runtimeAnimatorController = controller;
-                clips[clip].SampleAnimation(unit, time);
+                animator.runtimeAnimatorController = k.Controller;
+                k.Clips[clip].SampleAnimation(unit, time);
 
                 Bar(root, team[side > 0 ? 1 : 0].Bar, barBack, PedestalHeight + height * size + 0.12f, (float)rng.NextDouble() * 0.6f + 0.4f);
                 if (!active) return;
@@ -108,7 +137,8 @@ namespace Automatic.Editor
                         var hit = side > 0 && row == 0 && col == 2;
                         var formed = (side < 0 ? FxTimeline.HandCells : EnemyHand).Contains((row, col));
                         Place(BoardLayout.CellPos(side, row, col), side, Tiers[rng.Next(Tiers.Length)], formed,
-                            acting ? "attack" : hit ? "hit" : "idle", acting || hit ? 0.35f : (float)rng.NextDouble() * 2, 1, acting);
+                            acting ? "attack" : hit ? "hit" : "idle", acting || hit ? 0.35f : (float)rng.NextDouble() * 2, 1, acting,
+                            KuafuCells.Contains((side, row, col)) ? "kuafu" : "zheng");
                     }
                 for (var slot = 0; slot < BoardLayout.BenchSlots; slot++)
                     Place(BoardLayout.BenchPos(side, slot), side, Tiers[rng.Next(Tiers.Length)], false, "idle", (float)rng.NextDouble() * 2, BenchScale);
@@ -133,16 +163,20 @@ namespace Automatic.Editor
 
         /// <summary>
         /// Orientation and scale of a unit model, from a probe: the model's front is where the horn
-        /// is; Scale makes it UnitLength long, Height is then its height and Lift raises its feet to 0.
+        /// is, or where the toes point for a biped (no horn); Scale makes it UnitLength long or
+        /// UnitHeight tall, whichever is smaller, Height is then its height and Lift raises its feet to 0.
         /// </summary>
         internal static (Quaternion Facing, float Scale, float Height, float Lift) Probe(GameObject model, AnimationClip idle)
         {
             var probe = (GameObject)PrefabUtility.InstantiatePrefab(model);
             idle.SampleAnimation(probe, 0);
             var bounds = ArtPreview.Bounds(probe);
-            var horn = probe.GetComponentsInChildren<Transform>().First(t => t.name == "horn").position - bounds.center;
-            var facing = Quaternion.FromToRotation(new Vector3(horn.x, 0, horn.z).normalized, Vector3.forward);
-            var scale = UnitLength / Mathf.Max(bounds.size.x, bounds.size.z);
+            var bones = probe.GetComponentsInChildren<Transform>();
+            Vector3 At(string bone) => bones.First(t => t.name == bone).position;
+            var front = bones.Any(t => t.name == "horn") ? At("horn") - bounds.center
+                : At("L_ToeBase") + At("R_ToeBase") - At("L_Foot") - At("R_Foot");
+            var facing = Quaternion.FromToRotation(new Vector3(front.x, 0, front.z).normalized, Vector3.forward);
+            var scale = Mathf.Min(UnitLength / Mathf.Max(bounds.size.x, bounds.size.z), UnitHeight / bounds.size.y);
             Debug.Log($"[Board] model bounds {bounds.min} .. {bounds.max}, scale {scale:F3}");
             Object.DestroyImmediate(probe);
             return (facing, scale, bounds.size.y * scale, -bounds.min.y * scale); // the model origin is not at its feet
@@ -165,9 +199,11 @@ namespace Automatic.Editor
         }
 
         /// <summary>One state per clip, named after it, idle first; clips added to the FBX later get a state too.</summary>
-        internal static AnimatorController Controller(IEnumerable<AnimationClip> clips)
+        internal static AnimatorController Controller(IEnumerable<AnimationClip> clips) => Controller("zheng", clips);
+
+        private static AnimatorController Controller(string kind, IEnumerable<AnimationClip> clips)
         {
-            var path = ZhengDir + "zheng_anim.controller";
+            var path = ArtDir(kind) + kind + "_anim.controller";
             var controller = AssetDatabase.LoadAssetAtPath<AnimatorController>(path) ?? AnimatorController.CreateAnimatorControllerAtPath(path);
             var machine = controller.layers[0].stateMachine;
             var states = machine.states.Select(s => s.state.name).ToHashSet();

@@ -1,0 +1,7 @@
+{
+ "model": "chat_image_2.5_sunburst",
+ "input": "ca4e973a-670d-4779-8793-904dbbf1e875",
+ "prompt": "Keep exactly the same cartoon giant, the same pose, the same arms and hands, the same staff, the same snakes on the ears, the same topknot, beard, bead necklace and waist wrap, the same proportions and the same camera angle. Make only this change:\n- The giant is half bronze toy statue, half alive: the legs, the waist wrap, the left arm and the staff are still smooth golden-brown bronze with teal-green patina, cracking open with bright molten gold light shining through the cracks. The head, the snakes, the chest with the red sun emblem and the right arm are already alive with the original skin and colors, and the eyes glow. Small bronze flakes float away.\n- Plain pure white background, no text.",
+ "size": "1024x1024",
+ "quality": "low"
+}

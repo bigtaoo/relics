@@ -44,6 +44,15 @@ namespace Automatic.Editor
                 Horn = new(0.95f, 0.9f, 0.78f), TailRoot = new(0.74f, 0.4f, 0.2f), TailTip = new(0.74f, 0.4f, 0.2f),
                 Shade = new(0.75f, 0.58f, 0.6f), Highlight = new(0.25f, 0.2f, 0.15f),
             }),
+            // Living state (art/kuafu concept/toon_a_seedream.png): tan skin, dark brown hair, beard and
+            // staff (horn mask), yellow ear snakes (tail mask). A quarter of his bronze is patina, mostly
+            // in crevices, so the spots get a dark brown. Loincloth and beads have no mask.
+            ("kuafu", 0.11f, 0.04f, new()
+            {
+                Name = "living", Body = new(0.9f, 0.6f, 0.44f), Spots = new(0.3f, 0.18f, 0.13f),
+                Horn = new(0.3f, 0.17f, 0.12f), TailRoot = new(0.95f, 0.78f, 0.12f), TailTip = new(0.95f, 0.85f, 0.2f),
+                Shade = new(0.75f, 0.58f, 0.6f), Highlight = new(0.25f, 0.2f, 0.15f),
+            }),
         };
 
         /// <summary>The five variants of <paramref name="unit"/>: four cost tiers, then living.</summary>
