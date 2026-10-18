@@ -12,8 +12,8 @@ namespace Automatic.Game
     /// </summary>
     public static class Readability
     {
-        /// <summary>The acting ring's radii (Editor/BoardSlice.cs Ring).</summary>
-        private const float RingOuter = 0.5f, RingInner = 0.4f;
+        /// <summary>The acting ring's radii, as the battle draws it (BattleShow.Ring.cs).</summary>
+        private const float RingOuter = BattleShow.RingOuter, RingInner = BattleShow.RingInner;
 
         /// <summary>One "[Readability]" line for the camera at `at`; the camera is put back afterwards.</summary>
         public static string Report(string framing, Camera cam, Vector3 at, HudLayout layout, IReadOnlyList<Transform> allies, IReadOnlyList<Transform> enemies,
