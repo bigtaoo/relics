@@ -147,6 +147,13 @@ namespace Automatic.Game
                 foreach (var c in Camera.allCameras) c.allowHDR = false;
             if (LaunchArgs.Has("-noshadow"))
                 foreach (var l in FindObjectsByType<Light>(FindObjectsSortMode.None)) l.shadows = LightShadows.None;
+            // A quality level of design/12 (render scale and shadows); the frame rate stays -fps.
+            if (LaunchArgs.After("-quality") is string name)
+            {
+                var quality = QualityTiers.Parse(name, Tier.High);
+                QualityTiers.Apply(quality, 0);
+                Debug.Log($"[Bench] quality {quality}, render scale {QualityTiers.RenderScale(quality)}");
+            }
             Debug.Log($"[Bench] gpu switches: scale {(scale > 0 ? scale : 1)}, hdr {!LaunchArgs.Has("-nohdr")}, " +
                       $"shadows {!LaunchArgs.Has("-noshadow")}, outline {!LaunchArgs.Has("-nooutline")}");
         }

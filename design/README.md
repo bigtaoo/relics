@@ -14,6 +14,7 @@
 | [09-build-release.md](09-build-release.md) | 构建与发布：CI 流水线、版本线、各平台注意事项 | 草案 |
 | [10-battle-perf.md](10-battle-perf.md) | 战斗逻辑性能：召唤流 300 单位、服务器容量、解释器与原生对比 | 原型实测；Core 已编进壳（ADR-010）；A16 实测 |
 | [11-art-cost.md](11-art-cost.md) | 美术成本：验证期按计费 API 换算、单个角色成本、全游戏三种做法的预算、出图工具选择 | 首版估算 |
+| [12-quality-tiers.md](12-quality-tiers.md) | 画质分档与动态帧率：设备分档、发热降级、玩家设置 | 首版实现 |
 | [DECISIONS.md](DECISIONS.md) | 架构决策记录（ADR） | 持续更新 |
 
 规则：结论 + 理由 + 影响；单文件不超过 500 行；改代码前先改文档。

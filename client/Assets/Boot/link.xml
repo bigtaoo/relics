@@ -27,4 +27,8 @@
   <assembly fullname="Automatic.Battle.Core" preserve="all" />
   <!-- Raw JNI for launch arguments and device temperature on Android (hot Jni.cs). -->
   <assembly fullname="UnityEngine.AndroidJNIModule" preserve="all" />
+  <!-- Quality levels set render scale and shadows on a copy of the URP asset (hot QualityTiers.cs, design/12). -->
+  <assembly fullname="Unity.RenderPipelines.Universal.Runtime">
+    <type fullname="UnityEngine.Rendering.Universal.UniversalRenderPipelineAsset" preserve="all" />
+  </assembly>
 </linker>

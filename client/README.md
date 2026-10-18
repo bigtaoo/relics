@@ -107,6 +107,16 @@ lines in `artifacts/bench/android/`. The shell uses GPU (batched) skinning (`Pro
 `-scale S` renders at S times the screen resolution, `-nohdr` turns HDR off and `-noshadow` turns the
 main light's shadows off (next to `-nooutline`). Compare frame rates, not the reported GPU time: Mali
 lowers its clock under light load, so a frame capped at 30 fps reports more GPU time than an uncapped one.
+`-quality low|mid|high` applies a quality level of design/12 (render scale, shadows) and leaves the
+frame rate to `-fps`; prefer it to `-scale`, which also shrinks the UI.
+
+Quality and frame rate (design/12): the demo starts `QualityGovernor`, which picks the device tier
+from the GPU (`QualityTiers.AndroidTier`, `IosTier`), applies it to a runtime copy of the URP asset,
+and steps down one level when Android reports heat (every 10 s, at most one step per 60 s). Two
+buttons at the top right cycle quality (Auto/Low/Mid/High) and frame rate (Auto/30/60, with the
+measured rate), saved in PlayerPrefs. Launch overrides, not saved: `-quality`, `-fps 30|60`,
+`-tier low|mid|high` (pretend to be such a device), `-fakeheat S` (report heat after S seconds).
+The player log has a `[Quality]` line for the device and for each change.
 
 On Samsung phones (One UI 6+), USB debugging stays greyed out while *Auto Blocker* is on
 (Settings → Security and privacy → Auto Blocker). It also blocks installing the APK. Turn it off,

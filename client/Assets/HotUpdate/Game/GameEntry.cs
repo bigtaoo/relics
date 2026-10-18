@@ -31,6 +31,7 @@ namespace Automatic.Game
             }
             if (!LaunchArgs.Has("-hotcheck"))
             {
+                QualityGovernor.Run(buttons: true);
                 ShopDemo.Run(package);
                 return;
             }
